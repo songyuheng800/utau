@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UTAU P 配布站</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+         background: #fafafa; color: #222; line-height: 1.5; }
+  header { background: #222; color: #fff; padding: 12px 20px; display: flex;
+           justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; }
+  header span { font-size: 12px; color: #aaa; }
+  main { max-width: 760px; margin: 20px auto; padding: 0 16px; }
+  details { background: #fff; border: 1px solid #e5e5e5; border-radius: 4px;
+            padding: 10px 14px; margin-bottom: 14px; }
+  details summary { cursor: pointer; font-size: 13px; color: #555; }
+  details .row { display: flex; gap: 8px; margin-top: 10px; }
+  details input { flex: 1; padding: 6px 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px; }
+  details button { padding: 6px 14px; background: #222; color: #fff; border: none;
+                   border-radius: 3px; cursor: pointer; font-size: 13px; }
+  #drop { border: 2px dashed #bbb; border-radius: 4px; padding: 24px; text-align: center;
+          background: #fff; cursor: pointer; transition: opacity .2s; }
+  #drop.disabled { opacity: .5; cursor: not-allowed; pointer-events: none; }
+  #drop.drag { border-color: #222; background: #f0f0f0; }
+  #drop p { margin: 0; color: #666; font-size: 14px; }
+  #file { display: none; }
+  #msg { margin: 10px 0; padding: 8px 12px; border-radius: 3px; display: none; font-size: 13px; }
+  #msg.err { display: block; background: #fdecea; color: #b71c1c; }
+  #msg.ok  { display: block; background: #e8f5e9; color: #1b5e20; }
+  h2 { font-size: 14px; margin: 20px 0 8px; color: #444; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+  th { background: #f0f0f0; font-weight: 600; }
+  td.size { color: #888; width: 80px; }
+  td.op { width: 140px; text-align: right; }
+  a { color: #1565c0; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a.disabled { color: #999; pointer-events: none; }
+  button.del { background: none; border: none; color: #b71c1c; cursor: pointer; font-size: 13px; padding: 0; }
+  .empty { color: #999; padding: 20px; text-align: center; font-size: 13px; }
+  .agree { background: #fff; border: 1px solid #e5e5e5; border-radius: 4px;
+           padding: 12px 14px; margin: 16px 0; display: flex; gap: 10px; align-items: flex-start; }
+  .agree input { margin-top: 3px; width: 16px; height: 16px; flex-shrink: 0; }
+  .agree label { font-size: 13px; color: #333; line-height: 1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>UTAU P 配布站</h1>
+  <span id="repoLabel"></span>
+</header>
+<main>
+
+  <details id="auth">
+    <summary>上传者登录（需要 GitHub 账号 + Token，访客下载不需要）</summary>
+    <div class="row">
+      <input id="pat" type="password" placeholder="GitHub Personal Access Token (repo 权限)">
+      <button id="savePat">保存</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-top:6px">
+      任何人有 GitHub 账号即可上传。Token 只存在你自己浏览器 localStorage。
+    </div>
+  </details>
+
+  <div class="agree">
+    <input type="checkbox" id="agree">
+    <label for="agree">
+      我承诺我在二次发布时会标注来自哪里的网站取得的文件；若我违反上述条约，我同意承担所有法律责任。
+    </label>
+  </div>
+
+  <div id="drop" class="disabled">
+    <p>勾选上方协议后，把工程文件拖到这里，或点击选择</p>
+    <p style="margin-top:6px;font-size:12px;color:#999">.ust / .ustx / .vsq / .vsqx / .vpr / .pp2 / .pp3 / .zip，≤75MB</p>
+  </div>
+  <input type="file" id="file" multiple>
+  <div id="msg"></div>
+
+  <h2>已配布文件</h2>
+  <div id="list"><div class="empty">加载中…</div></div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+
+const host = location.hostname;
+let owner, repo;
+if (host.endsWith('.github.io')) {
+  owner = host.replace(/\.github\.io$/, '');
+  const parts = location.pathname.split('/').filter(Boolean);
+  repo = parts[0] || (owner + '.github.io');
+} else {
+  owner = localStorage.getItem('owner') || '';
+  repo  = localStorage.getItem('repo')  || '';
+}
+$('#repoLabel').textContent = owner ? owner + '/' + repo : '本地预览';
+
+const DIR = 'uploads';
+const ALLOWED = new Set(['.ust','.ustx','.vsq','.vsqx','.vpr','.pp2','.pp3','.zip']);
+let pat = localStorage.getItem('pat') || '';
+$('#pat').value = pat;
+$('#savePat').onclick = () => {
+  pat = $('#pat').value.trim();
+  localStorage.setItem('pat', pat);
+  flash('已保存', 'ok');
+};
+
+function flash(t,c){ const m=$('#msg'); m.textContent=t; m.className=c||'';
+  if(c==='ok') setTimeout(()=>m.className='',3000); }
+function fmtSize(b){ if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB';
+  return (b/1048576).toFixed(1)+' MB'; }
+function esc(s){ return String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const agreeBox = $('#agree');
+function refreshAgree() {
+  $('#drop').classList.toggle('disabled', !agreeBox.checked);
+  document.querySelectorAll('a.dl').forEach(a => a.classList.toggle('disabled', !agreeBox.checked));
+}
+agreeBox.onchange = refreshAgree;
+
+function api(method, path, body, auth) {
+  const headers = { 'Accept': 'application/vnd.github+json' };
+  if (auth && pat) headers['Authorization'] = 'token ' + pat;
+  return fetch('https://api.github.com' + path, {
+    method, headers, body: body ? JSON.stringify(body) : undefined
+  }).then(async r => {
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(j.message || ('HTTP '+r.status));
+    return j;
+  });
+}
+
+async function load() {
+  if (!owner || !repo) { $('#list').innerHTML='<div class="empty">请部署到 GitHub Pages</div>'; return; }
+  try {
+    const arr = await api('GET', `/repos/${owner}/${repo}/contents/${DIR}`);
+    const files = (Array.isArray(arr) ? arr : [])
+      .filter(f => f.type === 'file')
+      .sort((a,b) => b.size - a.size);
+    if (!files.length) { $('#list').innerHTML='<div class="empty">仓库 ' + esc(DIR) + '/ 目录为空</div>'; return; }
+    $('#list').innerHTML = '<table><thead><tr><th>文件名</th><th class="size">大小</th><th class="op"></th></tr></thead><tbody>' +
+      files.map(f =>
+        '<tr><td>'+esc(f.name)+'</td>'+
+        '<td class="size">'+fmtSize(f.size)+'</td>'+
+        '<td class="op">'+
+          '<a class="dl" href="'+esc(f.download_url)+'" target="_blank" rel="noopener">直链下载</a> '+
+          '<button class="del" data-sha="'+esc(f.sha)+'" data-name="'+esc(f.name)+'">删除</button>'+
+        '</td></tr>'
+      ).join('') + '</tbody></table>';
+    refreshAgree();
+    document.querySelectorAll('button.del').forEach(b => {
+      b.onclick = async () => {
+        if (!pat) { flash('先在上方填 Token 才能删除', 'err'); $('#auth').open=true; return; }
+        if (!confirm('删除 '+b.dataset.name+' ?')) return;
+        try {
+          await api('DELETE', `/repos/${owner}/${repo}/contents/${DIR}/${encodeURIComponent(b.dataset.name)}`,
+            { message:'del: '+b.dataset.name, sha:b.dataset.sha }, true);
+          flash('已删除','ok'); load();
+        } catch(e){ flash('删除失败：'+e.message,'err'); }
+      };
+    });
+  } catch(e) {
+    $('#list').innerHTML = '<div class="empty">'+esc(e.message)+'</div>';
+  }
+}
+
+function readB64(file){ return new Promise((res,rej)=>{
+  const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej;
+  r.readAsDataURL(file);
+}); }
+
+async function uploadAll(fileList) {
+  if (!agreeBox.checked) { flash('请先勾选协议再上传','err'); return; }
+  if (!pat) { flash('先在上方「上传者登录」填 Token 才能上传','err'); $('#auth').open=true; return; }
+  for (const f of Array.from(fileList)) {
+    const ext = '.' + (f.name.split('.').pop()||'').toLowerCase();
+    if (!ALLOWED.has(ext)) { flash('拒绝 '+f.name+'：不允许 '+ext,'err'); continue; }
+    if (f.size > 75*1024*1024) { flash('拒绝 '+f.name+'：超过 75MB','err'); continue; }
+    try {
+      const data = await readB64(f);
+      const path = `${DIR}/${encodeURIComponent(f.name)}`;
+      let sha;
+      try { const ex = await api('GET', `/repos/${owner}/${repo}/contents/${path}`, null, false); sha = ex.sha; } catch(_){}
+      await api('PUT', `/repos/${owner}/${repo}/contents/${path}`,
+        { message:'upload: '+f.name, content:data, ...(sha?{sha}:{}) }, true);
+      flash('已上传：'+f.name,'ok');
+    } catch(e){ flash('上传失败 '+f.name+'：'+e.message,'err'); }
+  }
+  load();
+}
+
+const drop=$('#drop'), fi=$('#file');
+drop.onclick = () => { if (agreeBox.checked) fi.click(); };
+fi.onchange = e => uploadAll(e.target.files);
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault(); if (agreeBox.checked) drop.classList.add('drag');
+}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault(); drop.classList.remove('drag');
+}));
+drop.addEventListener('drop', e => { if (agreeBox.checked) uploadAll(e.dataTransfer.files); });
+
+load();
+</script>
+</body>
+</html>
