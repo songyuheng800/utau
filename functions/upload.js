@@ -40,7 +40,12 @@ export async function onRequest(context) {
   }
 
   if (request.method === "GET") {
-    return handleList(GH_TOKEN, GH_USER, GH_REPO);
+    const url = new URL(request.url);
+    // ?download=文件名 → 代理下载，强制浏览器保存
+    if (url.searchParams.has("download")) {
+      return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, GH_REPO);
+    }
+    return handleList(url, GH_TOKEN, GH_USER, GH_REPO);
   }
 
   if (request.method === "POST") {
@@ -55,7 +60,7 @@ function json(obj, status = 200) {
 }
 
 /* ---------- 文件列表 ---------- */
-async function handleList(token, user, repo) {
+async function handleList(requestUrl, token, user, repo) {
   const apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/uploads`, {
     headers: {
       Authorization: `token ${token}`,
@@ -78,6 +83,8 @@ async function handleList(token, user, repo) {
     .map((x) => ({
       name: x.name,
       raw: `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(x.name)}`,
+      // 代理下载地址（同源，带 Content-Disposition: attachment，浏览器直接下载）
+      download: `${requestUrl.origin}/upload?download=${encodeURIComponent(x.name)}`,
     }))
     .sort((a, b) => b.name.localeCompare(a.name)); // 文件名带时间戳前缀，新的在前
 
@@ -138,6 +145,35 @@ async function handleUpload(request, token, user, repo) {
   }
   const ghMsg = result.message || result.errors || "GitHub 写入失败";
   return json({ ok: false, msg: String(ghMsg) }, 502);
+}
+
+/* ---------- 代理下载：强制浏览器保存文件 ---------- */
+async function handleDownload(filename, token, user, repo) {
+  // 安全校验：只允许文件名（不能含路径穿越）
+  const safeName = String(filename).split(/[\\/]/).pop();
+  const ext = safeName.split(".").pop().toLowerCase();
+  if (!ALLOWED_EXT.includes(ext)) {
+    return new Response("不允许的文件类型", { status: 400 });
+  }
+
+  // 从 GitHub raw 取文件内容
+  const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(safeName)}`;
+  const resp = await fetch(rawUrl, {
+    headers: { "User-Agent": "utau-sharing-proxy" },
+  });
+
+  if (!resp.ok) {
+    return new Response("文件不存在", { status: 404 });
+  }
+
+  // 关键：Content-Disposition: attachment 让浏览器下载而不是显示
+  const headers = new Headers(resp.headers);
+  headers.set("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+  headers.set("Content-Type", "application/octet-stream");
+  // 允许跨域（前端在 github.io）
+  headers.set("Access-Control-Allow-Origin", "*");
+
+  return new Response(resp.body, { status: 200, headers });
 }
 
 /* 去掉路径部分、替换 GitHub 不允许的字符、限制长度 */
