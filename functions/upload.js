@@ -183,7 +183,7 @@ async function handleDownload(filename, token, user, repo) {
 /* ---------- 删除文件（管理后台，需密码） ---------- */
 async function handleDelete(request, token, user, repo, env) {
   // 管理密码：优先读环境变量 ADMIN_PASSWORD，默认 283920
-  const ADMIN_PWD = env.ADMIN_PASSWORD || "283920";
+  const ADMIN_PWD = env.ADMIN_PASSWORD || "233920";
 
   let body;
   try { body = await request.json(); } catch (e) {
