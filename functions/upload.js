@@ -41,14 +41,23 @@ export async function onRequest(context) {
 
   if (request.method === "GET") {
     const url = new URL(request.url);
+    // ?stats=密码 → 高管站查看访问日志
+    if (url.searchParams.has("stats")) {
+      return handleStats(request, url.searchParams.get("stats"), env);
+    }
     // ?download=文件名 → 代理下载，强制浏览器保存
     if (url.searchParams.has("download")) {
-      return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, GH_REPO);
+      return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, GH_REPO, request, env);
     }
     return handleList(url, GH_TOKEN, GH_USER, GH_REPO);
   }
 
   if (request.method === "POST") {
+    // ?track=1 → 记录页面访问
+    const url = new URL(request.url);
+    if (url.searchParams.get("track") === "1") {
+      return handleTrack(request, env, "pageview");
+    }
     return handleUpload(request, GH_TOKEN, GH_USER, GH_REPO);
   }
 
@@ -152,13 +161,16 @@ async function handleUpload(request, token, user, repo) {
 }
 
 /* ---------- 代理下载：强制浏览器保存文件 ---------- */
-async function handleDownload(filename, token, user, repo) {
+async function handleDownload(filename, token, user, repo, request, env) {
   // 安全校验：只允许文件名（不能含路径穿越）
   const safeName = String(filename).split(/[\\/]/).pop();
   const ext = safeName.split(".").pop().toLowerCase();
   if (!ALLOWED_EXT.includes(ext)) {
     return new Response("不允许的文件类型", { status: 400 });
   }
+
+  // 记录下载日志
+  logEvent(env, { type: "download", file: safeName, request });
 
   // 从 GitHub raw 取文件内容
   const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(safeName)}`;
@@ -178,6 +190,44 @@ async function handleDownload(filename, token, user, repo) {
   headers.set("Access-Control-Allow-Origin", "*");
 
   return new Response(resp.body, { status: 200, headers });
+}
+
+/* ---------- 日志记录（Cloudflare KV） ---------- */
+async function logEvent(env, { type, file, request }) {
+  try {
+    if (!env.LOGS) return;
+    const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "unknown";
+    const ua = request.headers.get("User-Agent") || "unknown";
+    const existing = await env.LOGS.get("access_logs", "json") || [];
+    existing.unshift({
+      time: new Date().toISOString(),
+      type,
+      file: file || "",
+      ip,
+      ua: ua.substring(0, 200),
+    });
+    // 只保留最近 200 条
+    await env.LOGS.put("access_logs", JSON.stringify(existing.slice(0, 200)));
+  } catch (e) { /* KV 不可用时静默失败 */ }
+}
+
+/* ---------- 记录页面访问 ---------- */
+async function handleTrack(request, env, type) {
+  await logEvent(env, { type, request });
+  return json({ ok: true });
+}
+
+/* ---------- 高管站：查看日志 ---------- */
+async function handleStats(request, password, env) {
+  const SUPER_PWD = env.ADMIN_PASSWORD || "233677";
+  if (password !== SUPER_PWD) {
+    return json({ ok: false, msg: "密码错误" }, 403);
+  }
+  if (!env.LOGS) {
+    return json({ ok: true, logs: [], msg: "KV 未配置" });
+  }
+  const logs = await env.LOGS.get("access_logs", "json") || [];
+  return json({ ok: true, logs });
 }
 
 /* ---------- 删除文件（管理后台，需密码） ---------- */
