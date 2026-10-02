@@ -146,17 +146,23 @@ function applyLang() {
 
 document.getElementById("langBtn").onclick = (e) => {
   e.stopPropagation();
+  e.preventDefault();
   document.getElementById("langMenu").classList.toggle("show");
 };
 document.querySelectorAll("#langMenu button").forEach(b => {
-  b.onclick = () => {
+  b.onclick = (e) => {
+    e.stopPropagation();
     lang = b.dataset.lang;
     localStorage.setItem("utau_admin_lang", lang);
     document.getElementById("langMenu").classList.remove("show");
     applyLang();
   };
 });
-document.addEventListener("click", () => document.getElementById("langMenu").classList.remove("show"));
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".lang-wrap")) {
+    document.getElementById("langMenu").classList.remove("show");
+  }
+});
 
 function doLogin() {
   const u = document.getElementById("username").value.trim();
