@@ -196,46 +196,49 @@ function doLogin() {
   const err = document.getElementById("loginErr");
   err.style.display = "none";
 
-  // 显示加载环
+  const isCorrect = (u === ADMIN_USER && p === ADMIN_PASS);
+
+  // 加载文字多语言
+  const bootMsgs = {
+    zh: ["正在检验账户信息...","正在核验系统...","正在初始化...","正在开启服务器...","正在维护主站/副站生态...","服务器接入，准备进入系统...","服务器已启动"],
+    ja: ["アカウント情報を確認中...","システムを検証中...","初期化中...","サーバーを起動中...","メイン/サブサイトを維持中...","サーバー接続、システム準備中...","サーバー起動完了"],
+    en: ["Verifying account info...","Checking system...","Initializing...","Starting server...","Maintaining main/backup sites...","Server connected, preparing...","Server started"]
+  };
+  const msgs = bootMsgs[lang] || bootMsgs.zh;
+
   const overlay = document.getElementById("bootOverlay");
   const msg = document.getElementById("bootMsg");
   overlay.style.display = "flex";
   overlay.classList.remove("fade");
 
-  // 阶段消息
-  const steps = [
-    [0,  "正在检验账户信息..."],
-    [1500, "正在核验系统..."],
-    [3000, "正在初始化..."],
-    [4500, "正在开启服务器..."],
-    [6000, "正在维护主站/副站生态..."],
-    [7500, "服务器接入，准备进入系统..."],
-    [9000, "服务器已启动"],
-  ];
-  steps.forEach(([delay, text]) => {
-    setTimeout(() => { msg.textContent = text; }, delay);
-  });
-
-  // 10秒后检查密码
-  setTimeout(() => {
-    if (u !== ADMIN_USER || p !== ADMIN_PASS) {
-      // 密码错误：关闭加载环，显示错误
-      msg.textContent = "认证失败";
+  if (!isCorrect) {
+    // 密码错误：1.5秒后退出
+    msg.textContent = msgs[0];
+    setTimeout(() => {
+      msg.textContent = lang === "zh" ? "认证失败" : lang === "ja" ? "認証失敗" : "Authentication failed";
       setTimeout(() => {
         overlay.classList.add("fade");
         setTimeout(() => { overlay.style.display = "none"; }, 1200);
         err.style.display = "block";
       }, 800);
-    } else {
-      // 密码正确：加载环消散，进入管理页
-      overlay.classList.add("fade");
-      setTimeout(() => {
-        overlay.style.display = "none";
-        adminPwd = p;
-        sessionStorage.setItem("utau_admin_pwd", p);
-        showAdmin();
-      }, 1200);
-    }
+    }, 1500);
+    return;
+  }
+
+  // 密码正确：完整10秒启动序列
+  const steps = [[0,0],[1500,1],[3000,2],[4500,3],[6000,4],[7500,5],[9000,6]];
+  steps.forEach(([delay, idx]) => {
+    setTimeout(() => { msg.textContent = msgs[idx]; }, delay);
+  });
+
+  setTimeout(() => {
+    overlay.classList.add("fade");
+    setTimeout(() => {
+      overlay.style.display = "none";
+      adminPwd = p;
+      sessionStorage.setItem("utau_admin_pwd", p);
+      showAdmin();
+    }, 1200);
   }, 10000);
 }
 
