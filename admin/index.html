@@ -5,43 +5,105 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>管理后台 - UTAU 配布站</title>
 <style>
-*{box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif}
-body{max-width:800px;margin:40px auto;padding:0 16px;background:#fafafa}
-h1{font-size:20px;margin-bottom:8px}
-.hint{color:#888;font-size:13px;margin-bottom:24px}
-.login-box{background:#fff;border:1px solid #ddd;border-radius:8px;padding:32px;text-align:center;max-width:400px;margin:60px auto}
-.login-box input{width:100%;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:4px;margin:12px 0;box-sizing:border-box}
-.login-box button{width:100%;padding:10px;background:#333;color:#fff;border:none;border-radius:4px;font-size:15px;cursor:pointer}
-.error{color:#c00;font-size:13px;margin-top:8px}
-.file-list{background:#fff;border:1px solid #ddd;border-radius:8px;overflow:hidden}
-.file-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #eee;gap:12px}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#e8eef5 100%)}
+
+/* 语言选择按钮 */
+.lang-btn{position:absolute;top:40px;left:30px;padding:8px 20px;border:1.5px solid #4a7fb5;border-radius:6px;background:transparent;color:#4a7fb5;font-size:15px;cursor:pointer}
+
+/* 登录卡片 */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-card{background:#fff;border-radius:24px;padding:48px 36px 40px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(74,127,181,0.12)}
+
+/* Logo */
+.logo{text-align:center;margin-bottom:20px}
+.logo svg{width:90px;height:90px}
+.logo-text{font-size:28px;font-weight:800;color:#2c5f8a;letter-spacing:6px;margin-top:8px}
+
+/* 分隔线 */
+.divider{display:flex;align-items:center;gap:12px;margin:24px 0 28px}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:#ddd}
+.divider span{color:#555;font-size:15px;white-space:nowrap}
+
+/* 表单 */
+.field{margin-bottom:22px}
+.field label{display:block;font-size:15px;color:#333;margin-bottom:10px;font-weight:500}
+.field input{width:100%;padding:16px 18px;border:1.5px solid #e0e0e0;border-radius:12px;background:#f5f5f5;font-size:16px;outline:none;transition:border .2s}
+.field input:focus{border-color:#4a7fb5;background:#fff}
+.field input::placeholder{color:#aaa}
+
+/* 连接按钮 */
+.connect-btn{width:100%;padding:18px;border:none;border-radius:12px;background:linear-gradient(135deg,#2c6ba8 0%,#3a82c4 100%);color:#fff;font-size:18px;font-weight:600;cursor:pointer;letter-spacing:2px;margin-top:8px}
+.connect-btn small{display:block;font-size:12px;font-weight:400;letter-spacing:4px;opacity:.9;margin-top:2px}
+
+.error{color:#c0392b;font-size:14px;text-align:center;margin-top:14px;display:none}
+
+/* ===== 管理视图 ===== */
+.admin-view{max-width:800px;margin:0 auto;padding:24px 16px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.topbar a{color:#2c6ba8;text-decoration:none;font-size:15px}
+.topbar button{background:none;border:none;color:#888;font-size:14px;cursor:pointer}
+
+.stats{background:#fff;border-radius:16px;padding:20px 24px;margin-bottom:20px;box-shadow:0 4px 20px rgba(74,127,181,0.08)}
+.stats h1{font-size:22px;color:#222;margin-bottom:6px}
+.stats p{color:#888;font-size:14px}
+
+.file-list{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(74,127,181,0.08)}
+.file-row{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid #f0f0f0;gap:12px}
 .file-row:last-child{border-bottom:none}
-.file-name{flex:1;word-break:break-all;font-size:14px}
-.file-size{color:#888;font-size:12px;white-space:nowrap}
-.del-btn{padding:6px 14px;background:#c00;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap}
-.del-btn:hover{background:#a00}
-.back{display:inline-block;margin-bottom:16px;color:#0066cc;text-decoration:none;font-size:14px}
-.empty{padding:32px;text-align:center;color:#998}
-.logout{float:right;font-size:13px;color:#888;cursor:pointer;background:none;border:none}
+.file-icon{width:36px;height:36px;background:#eef4fa;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#2c6ba8;flex-shrink:0}
+.file-info{flex:1;min-width:0}
+.file-name{font-size:14px;color:#222;word-break:break-all;line-height:1.4}
+.file-meta{font-size:12px;color:#999;margin-top:2px}
+.del-btn{padding:8px 18px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap}
+.del-btn:hover{background:#c0392b}
+.empty{padding:48px;text-align:center;color:#aaa}
 </style>
 </head>
 <body>
 
+<!-- ===== 登录视图 ===== -->
 <div id="loginView">
-  <div class="login-box">
-    <h1>管理后台登录</h1>
-    <p class="hint">密码提示：身份证后六位</p>
-    <input type="password" id="pwd" placeholder="输入密码" autocomplete="off">
-    <button onclick="doLogin()">登录</button>
-    <div class="error" id="loginErr"></div>
+  <button class="lang-btn">中文 ▾</button>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="logo">
+        <svg viewBox="0 0 100 100">
+          <polygon points="50,5 85,30 85,70 50,95 15,70 15,30" fill="#2c6ba8"/>
+          <polygon points="50,15 75,33 75,67 50,85 25,67 25,33" fill="#fff"/>
+          <polygon points="42,25 52,25 52,75 42,75" fill="#2c6ba8"/>
+          <polygon points="55,42 65,42 65,58 55,58" fill="#2c6ba8"/>
+        </svg>
+        <div class="logo-text">HAAVIK</div>
+      </div>
+      <div class="divider"><span>请输入管理员凭证以继续</span></div>
+      <div class="field">
+        <label>用户名 / Username</label>
+        <input type="text" id="username" placeholder="输入用户名..." autocomplete="off">
+      </div>
+      <div class="field">
+        <label>密码 / Password</label>
+        <input type="password" id="password" placeholder="输入密码..." autocomplete="off">
+      </div>
+      <button class="connect-btn" onclick="doLogin()">
+        连接
+        <small>CONNECTION</small>
+      </button>
+      <div class="error" id="loginErr">用户名或密码错误</div>
+    </div>
   </div>
 </div>
 
+<!-- ===== 管理视图 ===== -->
 <div id="adminView" style="display:none">
-  <a href="/utau/" class="back">← 返回主站</a>
-  <button class="logout" onclick="doLogout()">退出登录</button>
-  <h1>文件管理</h1>
-  <p class="hint">共 <span id="count">0</span> 个文件，删除后不可恢复</p>
+  <div class="topbar">
+    <a href="/utau/">← 返回主站</a>
+    <button onclick="doLogout()">退出登录</button>
+  </div>
+  <div class="stats">
+    <h1>文件管理</h1>
+    <p>共 <span id="count">0</span> 个文件，删除后不可恢复</p>
+  </div>
   <div class="file-list" id="fileList">
     <div class="empty">加载中...</div>
   </div>
@@ -49,14 +111,19 @@ h1{font-size:20px;margin-bottom:8px}
 
 <script>
 const API = "https://utau-4oo.pages.dev/upload";
+const ADMIN_USER = "宋昱衡";
+const ADMIN_PASS = "283920";
 let adminPwd = sessionStorage.getItem("utau_admin_pwd") || "";
 
 function doLogin() {
-  const pwd = document.getElementById("pwd").value.trim();
-  if (!pwd) { document.getElementById("loginErr").textContent = "请输入密码"; return; }
-  // 简单校验，后端删除接口也会二次校验
-  adminPwd = pwd;
-  sessionStorage.setItem("utau_admin_pwd", pwd);
+  const u = document.getElementById("username").value.trim();
+  const p = document.getElementById("password").value.trim();
+  const err = document.getElementById("loginErr");
+  if (!u || !p) { err.style.display = "block"; return; }
+  if (u !== ADMIN_USER || p !== ADMIN_PASS) { err.style.display = "block"; return; }
+  err.style.display = "none";
+  adminPwd = p;
+  sessionStorage.setItem("utau_admin_pwd", p);
   showAdmin();
 }
 
@@ -69,6 +136,17 @@ function showAdmin() {
 function doLogout() {
   sessionStorage.removeItem("utau_admin_pwd");
   location.reload();
+}
+
+function extOf(name) {
+  return name.split(".").pop().toLowerCase();
+}
+function catOf(ext) {
+  if (ext === "ust") return "UTAU";
+  if (ext === "ustx") return "OpenUTAU";
+  if (["vsq","vsqx","vpr","pp2","pp3"].includes(ext)) return "Vocaloid";
+  if (["zip","rar"].includes(ext)) return "声库";
+  return "其他";
 }
 
 async function loadFiles() {
@@ -84,18 +162,19 @@ async function loadFiles() {
     }
     list.innerHTML = "";
     files.forEach(f => {
+      const ext = extOf(f.name);
       const row = document.createElement("div");
       row.className = "file-row";
-      const name = document.createElement("span");
-      name.className = "file-name";
-      name.textContent = f.name;
-      name.title = f.name;
-      const btn = document.createElement("button");
-      btn.className = "del-btn";
-      btn.textContent = "删除";
-      btn.onclick = () => doDelete(f.name, row);
-      row.appendChild(name);
-      row.appendChild(btn);
+      row.innerHTML = `
+        <div class="file-icon">${ext.toUpperCase()}</div>
+        <div class="file-info">
+          <div class="file-name"></div>
+          <div class="file-meta">${catOf(ext)} 工程</div>
+        </div>
+        <button class="del-btn">删除</button>
+      `;
+      row.querySelector(".file-name").textContent = f.name;
+      row.querySelector(".del-btn").onclick = () => doDelete(f.name, row);
       list.appendChild(row);
     });
   } catch (e) {
@@ -114,7 +193,7 @@ async function doDelete(filename, rowEl) {
     const data = await res.json();
     if (data.ok) {
       rowEl.remove();
-      document.getElementById("count").textContent = 
+      document.getElementById("count").textContent =
         parseInt(document.getElementById("count").textContent) - 1;
     } else {
       alert("删除失败：" + (data.msg || "未知错误"));
@@ -125,8 +204,11 @@ async function doDelete(filename, rowEl) {
 }
 
 // 回车登录
-document.getElementById("pwd").addEventListener("keydown", e => {
+document.getElementById("password").addEventListener("keydown", e => {
   if (e.key === "Enter") doLogin();
+});
+document.getElementById("username").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("password").focus();
 });
 
 // 已登录则直接进入
