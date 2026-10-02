@@ -52,6 +52,10 @@ export async function onRequest(context) {
     return handleUpload(request, GH_TOKEN, GH_USER, GH_REPO);
   }
 
+  if (request.method === "DELETE") {
+    return handleDelete(request, GH_TOKEN, GH_USER, GH_REPO, env);
+  }
+
   return json({ ok: false, msg: "方法错误" }, 405);
 }
 
@@ -174,6 +178,56 @@ async function handleDownload(filename, token, user, repo) {
   headers.set("Access-Control-Allow-Origin", "*");
 
   return new Response(resp.body, { status: 200, headers });
+}
+
+/* ---------- 删除文件（管理后台，需密码） ---------- */
+async function handleDelete(request, token, user, repo, env) {
+  // 管理密码：优先读环境变量 ADMIN_PASSWORD，默认 283920
+  const ADMIN_PWD = env.ADMIN_PASSWORD || "283920";
+
+  let body;
+  try { body = await request.json(); } catch (e) {
+    return json({ ok: false, msg: "请求体格式错误" }, 400);
+  }
+
+  // 校验密码
+  if (body.password !== ADMIN_PWD) {
+    return json({ ok: false, msg: "密码错误" }, 403);
+  }
+
+  const filename = String(body.filename || "").split(/[\\/]/).pop();
+  if (!filename) {
+    return json({ ok: false, msg: "缺少文件名" }, 400);
+  }
+
+  // 先查文件 SHA
+  const metaRes = await fetch(
+    `https://api.github.com/repos/${user}/${repo}/contents/uploads/${encodeURIComponent(filename)}`,
+    { headers: { Authorization: `token ${token}`, "User-Agent": "utau-sharing-proxy" } }
+  );
+  if (!metaRes.ok) {
+    return json({ ok: false, msg: "文件不存在" }, 404);
+  }
+  const meta = await metaRes.json();
+
+  // 删除
+  const delRes = await fetch(
+    `https://api.github.com/repos/${user}/${repo}/contents/uploads/${encodeURIComponent(filename)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `token ${token}`,
+        "User-Agent": "utau-sharing-proxy",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message: "删除文件: " + filename, sha: meta.sha }),
+    }
+  );
+
+  if (delRes.ok) {
+    return json({ ok: true });
+  }
+  return json({ ok: false, msg: "删除失败（GitHub " + delRes.status + "）" }, 502);
 }
 
 /* 去掉路径部分、替换 GitHub 不允许的字符、限制长度 */
