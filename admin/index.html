@@ -55,9 +55,18 @@ body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#
 .file-info{flex:1;min-width:0}
 .file-name{font-size:14px;color:#222;word-break:break-all;line-height:1.4}
 .file-meta{font-size:12px;color:#999;margin-top:2px}
-.del-btn{padding:8px 18px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap}
+.del-btn{padding:8px 14px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap}
 .del-btn:hover{background:#c0392b}
+.dl-btn{padding:8px 14px;background:#2c6ba8;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap;text-decoration:none;display:inline-block}
+.dl-btn:hover{background:#1e5a94}
+.copy-btn{padding:8px 12px;background:#f0f0f0;color:#555;border:none;border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap}
+.copy-btn:hover{background:#e0e0e0}
 .empty{padding:48px;text-align:center;color:#aaa}
+.search-box{width:100%;padding:12px 16px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:14px;margin-bottom:16px;outline:none;background:#fff}
+.search-box:focus{border-color:#4a7fb5}
+.stats-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.stat-pill{background:#fff;border-radius:20px;padding:6px 16px;font-size:13px;color:#555;box-shadow:0 2px 8px rgba(0,0,0,0.05)}
+.stat-pill b{color:#2c6ba8}
 </style>
 </head>
 <body>
@@ -106,6 +115,8 @@ body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#
     <h1 data-i18n="fileMgr">文件管理</h1>
     <p><span data-i18n="totalPrefix">共</span> <span id="count">0</span> <span data-i18n="totalSuffix">个文件，删除后不可恢复</span></p>
   </div>
+  <div class="stats-row" id="statsRow"></div>
+  <input type="text" class="search-box" id="searchBox" data-i18n-ph="searchPh" placeholder="搜索文件名...">
   <div class="file-list" id="fileList">
     <div class="empty" data-i18n="loading">加载中...</div>
   </div>
@@ -118,9 +129,9 @@ const ADMIN_PASS = "233677";
 let adminPwd = sessionStorage.getItem("utau_admin_pwd") || "";
 
 const I18N = {
-  zh: { greeting:"请输入管理员凭证以继续", userLabel:"用户名 / Username", userPh:"输入用户名...", passLabel:"密码 / Password", passPh:"输入密码...", connect:"连接", loginErr:"用户名或密码错误", passHint:"密码提示：管理员的身份证后六位", backHome:"← 返回主站", logout:"退出登录", fileMgr:"文件管理", totalPrefix:"共", totalSuffix:"个文件，删除后不可恢复", loading:"加载中...", empty:"暂无文件", delete:"删除", confirmDel:"确定删除「", delOk:"已删除", delFail:"删除失败：", netErr:"网络错误：", cat_utau:"UTAU工程", cat_ustx:"OpenUTAU工程", cat_vocaloid:"Vocaloid工程", cat_voicebank:"声库" },
-  ja: { greeting:"管理者認証情報を入力してください", userLabel:"ユーザー名 / Username", userPh:"ユーザー名を入力...", passLabel:"パスワード / Password", passPh:"パスワードを入力...", connect:"接続", loginErr:"ユーザー名またはパスワードが違います", passHint:"パスワードのヒント：管理者の身分証明書の下6桁", backHome:"← ホームに戻る", logout:"ログアウト", fileMgr:"ファイル管理", totalPrefix:"計", totalSuffix:"件、削除は復元不可です", loading:"読み込み中...", empty:"ファイルなし", delete:"削除", confirmDel:"「", delOk:"削除しました", delFail:"削除失敗：", netErr:"ネットワークエラー：", cat_utau:"UTAUプロジェクト", cat_ustx:"OpenUTAUプロジェクト", cat_vocaloid:"Vocaloidプロジェクト", cat_voicebank:"ボイスバンク" },
-  en: { greeting:"Enter admin credentials to continue", userLabel:"Username", userPh:"Enter username...", passLabel:"Password", passPh:"Enter password...", connect:"Connect", loginErr:"Invalid username or password", passHint:"Password hint: last 6 digits of admin ID", backHome:"← Back to home", logout:"Log out", fileMgr:"File Manager", totalPrefix:"", totalSuffix:"files total, deletion is permanent", loading:"Loading...", empty:"No files", delete:"Delete", confirmDel:"Are you sure to delete \"", delOk:"Deleted", delFail:"Delete failed: ", netErr:"Network error: ", cat_utau:"UTAU project", cat_ustx:"OpenUTAU project", cat_vocaloid:"Vocaloid project", cat_voicebank:"Voicebank" }
+  zh: { greeting:"请输入管理员凭证以继续", userLabel:"用户名 / Username", userPh:"输入用户名...", passLabel:"密码 / Password", passPh:"输入密码...", connect:"连接", loginErr:"用户名或密码错误", passHint:"密码提示：管理员的身份证后六位", backHome:"← 返回主站", logout:"退出登录", fileMgr:"文件管理", totalPrefix:"共", totalSuffix:"个文件，删除后不可恢复", loading:"加载中...", empty:"暂无文件", delete:"删除", download:"下载", copy:"复制", copied:"已复制", searchPh:"搜索文件名...", confirmDel:"确定删除「", delOk:"已删除", delFail:"删除失败：", netErr:"网络错误：", cat_utau:"UTAU工程", cat_ustx:"OpenUTAU工程", cat_vocaloid:"Vocaloid工程", cat_voicebank:"声库" },
+  ja: { greeting:"管理者認証情報を入力してください", userLabel:"ユーザー名 / Username", userPh:"ユーザー名を入力...", passLabel:"パスワード / Password", passPh:"パスワードを入力...", connect:"接続", loginErr:"ユーザー名またはパスワードが違います", passHint:"パスワードのヒント：管理者の身分証明書の下6桁", backHome:"← ホームに戻る", logout:"ログアウト", fileMgr:"ファイル管理", totalPrefix:"計", totalSuffix:"件、削除は復元不可です", loading:"読み込み中...", empty:"ファイルなし", delete:"削除", download:"ダウンロード", copy:"コピー", copied:"コピー済み", searchPh:"ファイル名を検索...", confirmDel:"「", delOk:"削除しました", delFail:"削除失敗：", netErr:"ネットワークエラー：", cat_utau:"UTAUプロジェクト", cat_ustx:"OpenUTAUプロジェクト", cat_vocaloid:"Vocaloidプロジェクト", cat_voicebank:"ボイスバンク" },
+  en: { greeting:"Enter admin credentials to continue", userLabel:"Username", userPh:"Enter username...", passLabel:"Password", passPh:"Enter password...", connect:"Connect", loginErr:"Invalid username or password", passHint:"Password hint: last 6 digits of admin ID", backHome:"← Back to home", logout:"Log out", fileMgr:"File Manager", totalPrefix:"", totalSuffix:"files total, deletion is permanent", loading:"Loading...", empty:"No files", delete:"Delete", download:"Download", copy:"Copy", copied:"Copied", searchPh:"Search files...", confirmDel:"Are you sure to delete \"", delOk:"Deleted", delFail:"Delete failed: ", netErr:"Network error: ", cat_utau:"UTAU project", cat_ustx:"OpenUTAU project", cat_vocaloid:"Vocaloid project", cat_voicebank:"Voicebank" }
 };
 
 let lang = localStorage.getItem("utau_admin_lang") || "zh";
@@ -196,39 +207,74 @@ function catKey(ext) {
   return "cat_utau";
 }
 
+let allFiles = [];
+
 async function loadFiles() {
   const t = I18N[lang];
   try {
     const res = await fetch(API + "?list=1");
     const data = await res.json();
-    const files = data.files || [];
-    document.getElementById("count").textContent = files.length;
-    const list = document.getElementById("fileList");
-    if (files.length === 0) {
-      list.innerHTML = '<div class="empty">' + t.empty + '</div>';
-      return;
-    }
-    list.innerHTML = "";
-    files.forEach(f => {
-      const ext = extOf(f.name);
-      const row = document.createElement("div");
-      row.className = "file-row";
-      row.innerHTML = `
-        <div class="file-icon">${ext.toUpperCase()}</div>
-        <div class="file-info">
-          <div class="file-name"></div>
-          <div class="file-meta">${t[catKey(ext)]}</div>
-        </div>
-        <button class="del-btn">${t.delete}</button>
-      `;
-      row.querySelector(".file-name").textContent = f.name;
-      row.querySelector(".del-btn").onclick = () => doDelete(f.name, row);
-      list.appendChild(row);
-    });
+    allFiles = data.files || [];
+    document.getElementById("count").textContent = allFiles.length;
+    renderStats(allFiles);
+    renderList(allFiles);
   } catch (e) {
     document.getElementById("fileList").innerHTML = '<div class="empty">' + I18N[lang].netErr + e.message + '</div>';
   }
 }
+
+function renderStats(files) {
+  const t = I18N[lang];
+  const counts = { cat_utau:0, cat_ustx:0, cat_vocaloid:0, cat_voicebank:0 };
+  files.forEach(f => { counts[catKey(extOf(f.name))]++; });
+  document.getElementById("statsRow").innerHTML =
+    '<span class="stat-pill">' + t.cat_utau + ' <b>' + counts.cat_utau + '</b></span>' +
+    '<span class="stat-pill">' + t.cat_ustx + ' <b>' + counts.cat_ustx + '</b></span>' +
+    '<span class="stat-pill">' + t.cat_vocaloid + ' <b>' + counts.cat_vocaloid + '</b></span>' +
+    '<span class="stat-pill">' + t.cat_voicebank + ' <b>' + counts.cat_voicebank + '</b></span>';
+}
+
+function renderList(files) {
+  const t = I18N[lang];
+  const list = document.getElementById("fileList");
+  if (files.length === 0) {
+    list.innerHTML = '<div class="empty">' + t.empty + '</div>';
+    return;
+  }
+  list.innerHTML = "";
+  files.forEach(f => {
+    const ext = extOf(f.name);
+    const row = document.createElement("div");
+    row.className = "file-row";
+    row.innerHTML = `
+      <div class="file-icon">${ext.toUpperCase()}</div>
+      <div class="file-info">
+        <div class="file-name"></div>
+        <div class="file-meta">${t[catKey(ext)]}</div>
+      </div>
+      <a class="dl-btn" href="${API}?download=${encodeURIComponent(f.name)}" download title="${t.download}">↓</a>
+      <button class="copy-btn" title="${t.copy}">⧉</button>
+      <button class="del-btn">${t.delete}</button>
+    `;
+    row.querySelector(".file-name").textContent = f.name;
+    row.querySelector(".del-btn").onclick = () => doDelete(f.name, row);
+    row.querySelector(".copy-btn").onclick = async (e) => {
+      try {
+        await navigator.clipboard.writeText(f.raw);
+        e.target.textContent = "✓";
+        setTimeout(() => { e.target.textContent = "⧉"; }, 1200);
+      } catch(err) { alert(f.raw); }
+    };
+    list.appendChild(row);
+  });
+}
+
+// 搜索过滤
+document.getElementById("searchBox").addEventListener("input", (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  const filtered = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
+  renderList(filtered);
+});
 
 async function doDelete(filename, rowEl) {
   const t = I18N[lang];
