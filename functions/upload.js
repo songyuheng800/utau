@@ -192,23 +192,41 @@ async function handleDownload(filename, token, user, repo, request, env) {
   return new Response(resp.body, { status: 200, headers });
 }
 
-/* ---------- 日志记录（Cloudflare KV） ---------- */
+/* ---------- 日志记录（写入 GitHub 仓库 logs.json） ---------- */
 async function logEvent(env, { type, file, request }) {
   try {
-    if (!env.LOGS) return;
+    const token = env.GH_TOKEN;
+    const user = env.GH_USER;
+    const repo = env.GH_REPO;
     const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "unknown";
-    const ua = request.headers.get("User-Agent") || "unknown";
-    const existing = await env.LOGS.get("access_logs", "json") || [];
-    existing.unshift({
-      time: new Date().toISOString(),
-      type,
-      file: file || "",
-      ip,
-      ua: ua.substring(0, 200),
+    const ua = (request.headers.get("User-Agent") || "unknown").substring(0, 200);
+    const entry = { time: new Date().toISOString(), type, file: file || "", ip, ua };
+
+    // 读取现有 logs.json
+    let logs = [];
+    let sha = null;
+    const getRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/logs.json`, {
+      headers: { Authorization: `token ${token}`, "User-Agent": "utau-sharing-proxy" }
     });
-    // 只保留最近 200 条
-    await env.LOGS.put("access_logs", JSON.stringify(existing.slice(0, 200)));
-  } catch (e) { /* KV 不可用时静默失败 */ }
+    if (getRes.ok) {
+      const meta = await getRes.json();
+      sha = meta.sha;
+      logs = JSON.parse(atob(meta.content));
+    }
+    logs.unshift(entry);
+    logs = logs.slice(0, 200); // 只保留最近 200 条
+
+    // 写回
+    await fetch(`https://api.github.com/repos/${user}/${repo}/contents/logs.json`, {
+      method: "PUT",
+      headers: { Authorization: `token ${token}`, "User-Agent": "utau-sharing-proxy", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "log: " + type,
+        content: btoa(unescape(encodeURIComponent(JSON.stringify(logs)))),
+        sha: sha || undefined
+      })
+    });
+  } catch (e) { /* 静默失败 */ }
 }
 
 /* ---------- 记录页面访问 ---------- */
@@ -223,10 +241,15 @@ async function handleStats(request, password, env) {
   if (password !== SUPER_PWD) {
     return json({ ok: false, msg: "密码错误" }, 403);
   }
-  if (!env.LOGS) {
-    return json({ ok: true, logs: [], msg: "KV 未配置" });
+  // 从 GitHub 读取 logs.json
+  const res = await fetch(`https://api.github.com/repos/${env.GH_USER}/${env.GH_REPO}/contents/logs.json`, {
+    headers: { Authorization: `token ${env.GH_TOKEN}`, "User-Agent": "utau-sharing-proxy" }
+  });
+  if (!res.ok) {
+    return json({ ok: true, logs: [] });
   }
-  const logs = await env.LOGS.get("access_logs", "json") || [];
+  const meta = await res.json();
+  const logs = JSON.parse(atob(meta.content));
   return json({ ok: true, logs });
 }
 
