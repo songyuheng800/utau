@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 - UTAU 配布站</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif}
+body{max-width:800px;margin:40px auto;padding:0 16px;background:#fafafa}
+h1{font-size:20px;margin-bottom:8px}
+.hint{color:#888;font-size:13px;margin-bottom:24px}
+.login-box{background:#fff;border:1px solid #ddd;border-radius:8px;padding:32px;text-align:center;max-width:400px;margin:60px auto}
+.login-box input{width:100%;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:4px;margin:12px 0;box-sizing:border-box}
+.login-box button{width:100%;padding:10px;background:#333;color:#fff;border:none;border-radius:4px;font-size:15px;cursor:pointer}
+.error{color:#c00;font-size:13px;margin-top:8px}
+.file-list{background:#fff;border:1px solid #ddd;border-radius:8px;overflow:hidden}
+.file-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #eee;gap:12px}
+.file-row:last-child{border-bottom:none}
+.file-name{flex:1;word-break:break-all;font-size:14px}
+.file-size{color:#888;font-size:12px;white-space:nowrap}
+.del-btn{padding:6px 14px;background:#c00;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap}
+.del-btn:hover{background:#a00}
+.back{display:inline-block;margin-bottom:16px;color:#0066cc;text-decoration:none;font-size:14px}
+.empty{padding:32px;text-align:center;color:#998}
+.logout{float:right;font-size:13px;color:#888;cursor:pointer;background:none;border:none}
+</style>
+</head>
+<body>
+
+<div id="loginView">
+  <div class="login-box">
+    <h1>管理后台登录</h1>
+    <p class="hint">密码提示：身份证后六位</p>
+    <input type="password" id="pwd" placeholder="输入密码" autocomplete="off">
+    <button onclick="doLogin()">登录</button>
+    <div class="error" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="adminView" style="display:none">
+  <a href="/utau/" class="back">← 返回主站</a>
+  <button class="logout" onclick="doLogout()">退出登录</button>
+  <h1>文件管理</h1>
+  <p class="hint">共 <span id="count">0</span> 个文件，删除后不可恢复</p>
+  <div class="file-list" id="fileList">
+    <div class="empty">加载中...</div>
+  </div>
+</div>
+
+<script>
+const API = "https://utau-4oo.pages.dev/upload";
+let adminPwd = sessionStorage.getItem("utau_admin_pwd") || "";
+
+function doLogin() {
+  const pwd = document.getElementById("pwd").value.trim();
+  if (!pwd) { document.getElementById("loginErr").textContent = "请输入密码"; return; }
+  // 简单校验，后端删除接口也会二次校验
+  adminPwd = pwd;
+  sessionStorage.setItem("utau_admin_pwd", pwd);
+  showAdmin();
+}
+
+function showAdmin() {
+  document.getElementById("loginView").style.display = "none";
+  document.getElementById("adminView").style.display = "block";
+  loadFiles();
+}
+
+function doLogout() {
+  sessionStorage.removeItem("utau_admin_pwd");
+  location.reload();
+}
+
+async function loadFiles() {
+  try {
+    const res = await fetch(API + "?list=1");
+    const data = await res.json();
+    const files = data.files || [];
+    document.getElementById("count").textContent = files.length;
+    const list = document.getElementById("fileList");
+    if (files.length === 0) {
+      list.innerHTML = '<div class="empty">暂无文件</div>';
+      return;
+    }
+    list.innerHTML = "";
+    files.forEach(f => {
+      const row = document.createElement("div");
+      row.className = "file-row";
+      const name = document.createElement("span");
+      name.className = "file-name";
+      name.textContent = f.name;
+      name.title = f.name;
+      const btn = document.createElement("button");
+      btn.className = "del-btn";
+      btn.textContent = "删除";
+      btn.onclick = () => doDelete(f.name, row);
+      row.appendChild(name);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  } catch (e) {
+    document.getElementById("fileList").innerHTML = '<div class="empty">加载失败：' + e.message + '</div>';
+  }
+}
+
+async function doDelete(filename, rowEl) {
+  if (!confirm("确定删除「" + filename + "」？")) return;
+  try {
+    const res = await fetch(API, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: filename, password: adminPwd })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      rowEl.remove();
+      document.getElementById("count").textContent = 
+        parseInt(document.getElementById("count").textContent) - 1;
+    } else {
+      alert("删除失败：" + (data.msg || "未知错误"));
+    }
+  } catch (e) {
+    alert("网络错误：" + e.message);
+  }
+}
+
+// 回车登录
+document.getElementById("pwd").addEventListener("keydown", e => {
+  if (e.key === "Enter") doLogin();
+});
+
+// 已登录则直接进入
+if (adminPwd) showAdmin();
+</script>
+</body>
+</html>
