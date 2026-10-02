@@ -206,8 +206,8 @@ function renderList(listId, files, exts) {
 
     const link = document.createElement("a");
     link.className = "download-link";
-    link.href = item.raw;
-    link.textContent = "直链下载";
+    link.href = item.download || item.raw;
+    link.textContent = "下载";
     link.target = "_blank";
     link.rel = "noopener";
     link.download = item.name;
