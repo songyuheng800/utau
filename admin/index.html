@@ -196,7 +196,7 @@ function doLogin() {
   const err = document.getElementById("loginErr");
   err.style.display = "none";
 
-  const isCorrect = (u === ADMIN_USER && p === ADMIN_PASS);
+  const isCorrect = (["admin","宋昱衡","1"].includes(u) && p === ADMIN_PASS);
 
   // 加载文字多语言
   const bootMsgs = {
