@@ -6,43 +6,34 @@
 <title>高管后台 - UTAU 配布站</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
-html,body{overflow-x:hidden}
 body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#e8eef5 100%)}
-.login-page{min-height:100vh;padding:20px;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
-.lang-wrap{position:relative;align-self:flex-start;margin-bottom:16px}
-.lang-btn{padding:8px 18px;border:1.5px solid #4a7fb5;border-radius:6px;background:transparent;color:#4a7fb5;font-size:14px;cursor:pointer}
-.lang-menu{display:none;position:absolute;top:100%;left:0;margin-top:6px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.1);z-index:10;min-width:120px;overflow:hidden}
-.lang-menu.show{display:block}
-.lang-menu button{display:block;width:100%;padding:10px 16px;background:none;border:none;text-align:left;font-size:14px;cursor:pointer;color:#333}
-.lang-menu button:hover{background:#f0f5fa}
-.lang-menu button.active{color:#4a7fb5;font-weight:600}
-.login-wrap{flex:1;display:flex;align-items:center;justify-content:center}
+.login-page{min-height:100vh;padding:20px;max-width:480px;margin:0 auto}
+.lang-btn{padding:8px 18px;border:1.5px solid #4a7fb5;border-radius:6px;background:transparent;color:#4a7fb5;font-size:14px;cursor:pointer;margin-bottom:20px}
 .login-card{background:#fff;border-radius:20px;padding:36px 24px 32px;width:100%;box-shadow:0 20px 60px rgba(74,127,181,0.12)}
 .logo{text-align:center;margin-bottom:16px}
-.logo img{width:100px;height:auto;display:block;margin:0 auto}
+.logo img{width:100px;margin:0 auto}
 .divider{display:flex;align-items:center;gap:10px;margin:20px 0 24px}
 .divider::before,.divider::after{content:"";flex:1;height:1px;background:#ddd}
 .divider span{color:#555;font-size:14px;white-space:nowrap}
 .field{margin-bottom:18px}
-.field label{display:block;font-size:14px;color:#333;margin-bottom:8px;font-weight:500}
+.field label{display:block;font-size:14px;color:#333;margin-bottom:8px}
 .field input{width:100%;padding:14px 16px;border:1.5px solid #e0e0e0;border-radius:10px;background:#f5f5f5;font-size:15px;outline:none}
 .field input:focus{border-color:#4a7fb5;background:#fff}
-.field input::placeholder{color:#aaa}
-.connect-btn{width:100%;padding:15px;border:none;border-radius:10px;background:linear-gradient(135deg,#2c6ba8 0%,#3a82c4 100%);color:#fff;font-size:17px;font-weight:600;cursor:pointer;letter-spacing:2px;margin-top:6px}
+.connect-btn{width:100%;padding:15px;border:none;border-radius:10px;background:linear-gradient(135deg,#2c6ba8,#3a82c4);color:#fff;font-size:17px;font-weight:600;cursor:pointer;margin-top:6px}
 .connect-btn small{display:block;font-size:11px;font-weight:400;letter-spacing:4px;opacity:.9;margin-top:2px}
 .error{color:#c0392b;font-size:13px;text-align:center;margin-top:12px;display:none}
+.hint{text-align:center;color:#aaa;font-size:12px;margin-top:16px}
 .admin-view{max-width:800px;margin:0 auto;padding:24px 16px}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .topbar a{color:#2c6ba8;text-decoration:none;font-size:15px}
 .topbar button{background:none;border:none;color:#888;font-size:14px;cursor:pointer}
 .stats{background:#fff;border-radius:16px;padding:20px 24px;margin-bottom:16px;box-shadow:0 4px 20px rgba(74,127,181,0.08)}
-.stats h1{font-size:20px;color:#222;margin-bottom:6px}
-.stats-row{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap}
+.stats h1{font-size:20px;margin-bottom:12px}
+.stats-row{display:flex;gap:12px;flex-wrap:wrap}
 .stat-pill{background:#f0f5fa;border-radius:20px;padding:6px 14px;font-size:13px;color:#555}
 .stat-pill b{color:#2c6ba8}
 .log-list{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(74,127,181,0.08)}
 .log-row{padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:13px}
-.log-row:last-child{border-bottom:none}
 .log-time{color:#999;font-size:12px}
 .log-type{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:8px}
 .type-view{background:#e8f4e8;color:#2a7a2a}
@@ -56,53 +47,44 @@ body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#
 
 <div id="loginView">
   <div class="login-page">
-    <div class="lang-wrap">
-      <button class="lang-btn" id="langBtn">中文 ▾</button>
-      <div class="lang-menu" id="langMenu">
-        <button data-lang="zh" class="active">中文</button>
-        <button data-lang="ja">日本語</button>
-        <button data-lang="en">English</button>
+    <button class="lang-btn">中文 ▾</button>
+    <div class="login-card">
+      <div class="logo">
+        <img src="../logo.png?v=5">
       </div>
-    </div>
-    <div class="login-wrap">
-      <div class="login-card">
-        <div class="logo">
-          <img src="../logo.png?v=4" alt="HAAVIK">
-        </div>
-        <div class="divider"><span data-i18n="greeting">请输入管理员凭证以继续</span></div>
-        <div class="field">
-          <label data-i18n="userLabel">用户名 / Username</label>
-          <input type="text" id="username" value="宋昱衡" autocomplete="off">
-        </div>
-        <div class="field">
-          <label data-i18n="passLabel">密码 / Password</label>
-          <input type="password" id="password" data-i18n-ph="passPh" placeholder="输入密码..." autocomplete="off">
-        </div>
-        <button class="connect-btn" onclick="doLogin()">
-          <span data-i18n="connect">连接</span>
-          <small>CONNECTION</small>
-        </button>
-        <div class="error" id="loginErr" data-i18n="loginErr">用户名或密码错误</div>
-        <div style="text-align:center;color:#aaa;font-size:12px;margin-top:16px" data-i18n="passHint">密码提示：管理员的身份证后六位</div>
+      <div class="divider"><span>请输入管理员凭证以继续</span></div>
+      <div class="field">
+        <label>用户名 / Username</label>
+        <input type="text" id="username" value="宋昱衡" autocomplete="off">
       </div>
+      <div class="field">
+        <label>密码 / Password</label>
+        <input type="password" id="password" placeholder="输入密码..." autocomplete="off">
+      </div>
+      <button class="connect-btn" onclick="doLogin()">
+        连接
+        <small>CONNECTION</small>
+      </button>
+      <div class="error" id="loginErr">用户名或密码错误</div>
+      <div class="hint">密码提示：管理员的身份证后六位</div>
     </div>
   </div>
 </div>
 
 <div id="adminView" style="display:none">
   <div class="topbar">
-    <a href="../" data-i18n="backHome">← 返回管理站</a>
-    <button onclick="doLogout()" data-i18n="logout">退出登录</button>
+    <a href="../">← 返回管理站</a>
+    <button onclick="doLogout()">退出登录</button>
   </div>
   <div class="stats">
-    <h1 data-i18n="title">访问日志</h1>
+    <h1>访问日志</h1>
     <div class="stats-row">
-      <span class="stat-pill"><span data-i18n="viewsLabel">总访问</span> <b id="totalViews">0</b></span>
-      <span class="stat-pill"><span data-i18n="dlsLabel">总下载</span> <b id="totalDls">0</b></span>
+      <span class="stat-pill">总访问 <b id="totalViews">0</b></span>
+      <span class="stat-pill">总下载 <b id="totalDls">0</b></span>
     </div>
   </div>
   <div class="log-list" id="logList">
-    <div class="empty" data-i18n="loading">加载中...</div>
+    <div class="empty">加载中...</div>
   </div>
 </div>
 
@@ -112,61 +94,15 @@ const ADMIN_USER = "宋昱衡";
 const ADMIN_PASS = "233677";
 let adminPwd = sessionStorage.getItem("utau_adm_pwd") || "";
 
-const I18N = {
-  zh: { greeting:"请输入管理员凭证以继续", userLabel:"用户名 / Username", userPh:"输入用户名...", passLabel:"密码 / Password", passPh:"输入密码...", connect:"连接", loginErr:"用户名或密码错误", passHint:"密码提示：管理员的身份证后六位", backHome:"← 返回管理站", logout:"退出登录", title:"访问日志", viewsLabel:"总访问 ", dlsLabel:"总下载 ", loading:"加载中...", empty:"暂无日志记录", type_view:"访问", type_download:"下载" },
-  ja: { greeting:"管理者認証情報を入力してください", userLabel:"ユーザー名 / Username", userPh:"ユーザー名を入力...", passLabel:"パスワード / Password", passPh:"パスワードを入力...", connect:"接続", loginErr:"ユーザー名またはパスワードが違います", passHint:"パスワードのヒント：管理者の身分証明書の下6桁", backHome:"← 管理ページに戻る", logout:"ログアウト", title:"アクセスログ", viewsLabel:"総アクセス ", dlsLabel:"総ダウンロード ", loading:"読み込み中...", empty:"ログなし", type_view:"アクセス", type_download:"ダウンロード" },
-  en: { greeting:"Enter admin credentials to continue", userLabel:"Username", userPh:"Enter username...", passLabel:"Password", passPh:"Enter password...", connect:"Connect", loginErr:"Invalid username or password", passHint:"Password hint: last 6 digits of admin ID", backHome:"← Back to admin", logout:"Log out", title:"Access Logs", viewsLabel:"Views ", dlsLabel:"Downloads ", loading:"Loading...", empty:"No logs", type_view:"View", type_download:"Download" }
-};
-
-let lang = localStorage.getItem("utau_admin_lang") || "zh";
-
-function applyLang() {
-  const t = I18N[lang];
-  document.querySelectorAll("[data-i18n]").forEach(el => {
-    const key = el.getAttribute("data-i18n");
-    if (t[key] !== undefined) el.textContent = t[key];
-  });
-  document.querySelectorAll("[data-i18n-ph]").forEach(el => {
-    const key = el.getAttribute("data-i18n-ph");
-    if (t[key]) el.placeholder = t[key];
-  });
-  document.getElementById("langBtn").textContent = (lang === "zh" ? "中文" : lang === "ja" ? "日本語" : "English") + " ▾";
-  document.querySelectorAll("#langMenu button").forEach(b => {
-    b.classList.toggle("active", b.dataset.lang === lang);
-  });
-  if (document.getElementById("adminView").style.display === "block") loadLogs();
-}
-
-document.getElementById("langBtn").onclick = (e) => {
-  e.stopPropagation(); e.preventDefault();
-  document.getElementById("langMenu").classList.toggle("show");
-};
-document.querySelectorAll("#langMenu button").forEach(b => {
-  b.onclick = (e) => {
-    e.stopPropagation();
-    lang = b.dataset.lang;
-    localStorage.setItem("utau_admin_lang", lang);
-    document.getElementById("langMenu").classList.remove("show");
-    applyLang();
-  };
-});
-document.addEventListener("click", (e) => {
-  if (!e.target.closest(".lang-wrap")) document.getElementById("langMenu").classList.remove("show");
-});
-
 function doLogin() {
   const u = document.getElementById("username").value.trim();
   const p = document.getElementById("password").value.trim();
-  const err = document.getElementById("loginErr");
-  if (!u || !p) { err.style.display = "block"; return; }
-  if (u !== ADMIN_USER || p !== ADMIN_PASS) { err.style.display = "block"; return; }
-  err.style.display = "none";
+  if (u !== ADMIN_USER || p !== ADMIN_PASS) {
+    document.getElementById("loginErr").style.display = "block";
+    return;
+  }
   adminPwd = p;
   sessionStorage.setItem("utau_adm_pwd", p);
-  showAdmin();
-}
-
-function showAdmin() {
   document.getElementById("loginView").style.display = "none";
   document.getElementById("adminView").style.display = "block";
   loadLogs();
@@ -178,47 +114,52 @@ function doLogout() {
 }
 
 async function loadLogs() {
-  const t = I18N[lang];
   try {
     const res = await fetch(API + "?stats=" + encodeURIComponent(adminPwd));
     const data = await res.json();
     if (!data.ok) {
-      document.getElementById("logList").innerHTML = '<div class="empty">' + (data.msg || "Error") + '</div>';
+      document.getElementById("logList").innerHTML = '<div class="empty">' + (data.msg || "加载失败") + '</div>';
       return;
     }
     const logs = data.logs || [];
-    document.getElementById("totalViews").textContent = logs.filter(l => l.type === "pageview").length;
-    document.getElementById("totalDls").textContent = logs.filter(l => l.type === "download").length;
+    const views = logs.filter(l => l.type === "pageview").length;
+    const dls = logs.filter(l => l.type === "download").length;
+    document.getElementById("totalViews").textContent = views;
+    document.getElementById("totalDls").textContent = dls;
 
     const list = document.getElementById("logList");
     if (logs.length === 0) {
-      list.innerHTML = '<div class="empty">' + t.empty + '</div>';
+      list.innerHTML = '<div class="empty">暂无日志记录</div>';
       return;
     }
     list.innerHTML = "";
-    logs.forEach(l => {
+    logs.forEach(function(l) {
       const row = document.createElement("div");
       row.className = "log-row";
       const d = new Date(l.time);
-      const timeStr = d.toLocaleString("zh-CN", { month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" });
+      const ts = d.toLocaleString("zh-CN", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
       const isDl = l.type === "download";
-      row.innerHTML = `
-        <div class="log-time">${timeStr}</div>
-        <span class="log-type ${isDl ? "type-dl" : "type-view"}">${isDl ? t.type_download : t.type_view}</span>
-        <span class="log-file">${l.file || "—"}</span>
-        <div class="log-ip">IP: ${l.ip} | ${(l.ua || "").substring(0,60)}</div>
-      `;
+      row.innerHTML =
+        '<div class="log-time">' + ts + '</div>' +
+        '<span class="log-type ' + (isDl ? "type-dl" : "type-view") + '">' + (isDl ? "下载" : "访问") + '</span>' +
+        '<span class="log-file">' + (l.file || "页面访问") + '</span>' +
+        '<div class="log-ip">IP: ' + l.ip + ' | ' + (l.ua || "").substring(0,60) + '</div>';
       list.appendChild(row);
     });
   } catch (e) {
-    document.getElementById("logList").innerHTML = '<div class="empty">Error: ' + e.message + '</div>';
+    document.getElementById("logList").innerHTML = '<div class="empty">网络错误：' + e.message + '</div>';
   }
 }
 
-document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-document.getElementById("username").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("password").focus(); });
-applyLang();
-if (adminPwd) showAdmin();
+document.getElementById("password").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") doLogin();
+});
+
+if (adminPwd) {
+  document.getElementById("loginView").style.display = "none";
+  document.getElementById("adminView").style.display = "block";
+  loadLogs();
+}
 </script>
 </body>
 </html>
