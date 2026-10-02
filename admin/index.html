@@ -252,8 +252,8 @@ function renderList(files) {
         <div class="file-name"></div>
         <div class="file-meta">${t[catKey(ext)]}</div>
       </div>
-      <a class="dl-btn" href="${API}?download=${encodeURIComponent(f.name)}" download title="${t.download}">↓</a>
-      <button class="copy-btn" title="${t.copy}">⧉</button>
+      <a class="dl-btn" href="${API}?download=${encodeURIComponent(f.name)}" download>${t.download}</a>
+      <button class="copy-btn">${t.copy}</button>
       <button class="del-btn">${t.delete}</button>
     `;
     row.querySelector(".file-name").textContent = f.name;
