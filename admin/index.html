@@ -131,6 +131,12 @@ body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#
     <p><span data-i18n="totalPrefix">共</span> <span id="count">0</span> <span data-i18n="totalSuffix">个文件，删除后不可恢复</span></p>
   </div>
   <div class="stats-row" id="statsRow"></div>
+  <div style="background:#fff;border-radius:16px;padding:16px 20px;margin-bottom:16px;box-shadow:0 4px 20px rgba(74,127,181,0.08);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input type="file" id="adminFile" style="display:none" accept=".ust,.ustx,.vsq,.vsqx,.vpr,.pp2,.pp3,.zip,.rar">
+    <button class="dl-btn" onclick="document.getElementById('adminFile').click()">选择文件</button>
+    <button class="connect-btn" style="padding:8px 16px;font-size:14px;letter-spacing:0" onclick="adminUpload()">上传</button>
+    <span id="adminUploadStatus" style="font-size:13px;color:#888"></span>
+  </div>
   <input type="text" class="search-box" id="searchBox" data-i18n-ph="searchPh" placeholder="搜索文件名...">
   <div class="file-list" id="fileList">
     <div class="empty" data-i18n="loading">加载中...</div>
@@ -330,6 +336,37 @@ document.getElementById("searchBox").addEventListener("input", (e) => {
   const filtered = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
   renderList(filtered);
 });
+
+async function adminUpload() {
+  const input = document.getElementById("adminFile");
+  const status = document.getElementById("adminUploadStatus");
+  const f = input.files[0];
+  if (!f) { status.textContent = "请先选择文件"; return; }
+  const ext = f.name.split(".").pop().toLowerCase();
+  if (!["ust","ustx","vsq","vsqx","vpr","pp2","pp3","zip","rar"].includes(ext)) {
+    status.textContent = "文件类型不允许"; return;
+  }
+  status.textContent = "上传中...";
+  const buf = await f.arrayBuffer();
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: f.name, data: b64 })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      status.textContent = "上传成功";
+      input.value = "";
+      loadFiles();
+    } else {
+      status.textContent = "上传失败：" + (data.msg || "");
+    }
+  } catch (e) {
+    status.textContent = "网络错误：" + e.message;
+  }
+}
 
 async function doDelete(filename, rowEl) {
   const t = I18N[lang];
