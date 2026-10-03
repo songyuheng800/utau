@@ -131,12 +131,12 @@ body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#
     <p><span data-i18n="totalPrefix">共</span> <span id="count">0</span> <span data-i18n="totalSuffix">个文件，删除后不可恢复</span></p>
   </div>
   <div class="stats-row" id="statsRow"></div>
-  <div id="adminDrop" style="border:2px dashed #444;padding:24px;text-align:center;margin:16px 0;border-radius:8px;cursor:pointer;background:#fff">
+  <label id="adminDrop" style="display:block;border:2px dashed #444;padding:24px;text-align:center;margin:16px 0;border-radius:8px;cursor:pointer;background:#fff">
     <p style="font-size:14px;color:#555;margin-bottom:10px">拖拽文件到此处上传，或点击选择文件</p>
-    <div style="padding:8px 16px;border:1px solid #888;background:#f7f7f7;border-radius:4px;cursor:pointer;font-size:14px;display:inline-block">选择文件</div>
+    <span style="padding:8px 16px;border:1px solid #888;background:#f7f7f7;border-radius:4px;cursor:pointer;font-size:14px;display:inline-block">选择文件</span>
     <div id="adminUploadStatus" style="font-size:13px;color:#888;margin-top:8px"></div>
-  </div>
-  <input type="file" id="adminFile" style="display:none" accept=".ust,.ustx,.vsq,.vsqx,.vpr,.pp2,.pp3,.zip,.rar">
+    <input type="file" id="adminFile" accept=".ust,.ustx,.vsq,.vsqx,.vpr,.pp2,.pp3,.zip,.rar" style="display:none">
+  </label>
   <input type="text" class="search-box" id="searchBox" data-i18n-ph="searchPh" placeholder="搜索文件名...">
   <div class="file-list" id="fileList">
     <div class="empty" data-i18n="loading">加载中...</div>
@@ -339,7 +339,6 @@ document.getElementById("searchBox").addEventListener("input", (e) => {
 
 const adminDrop = document.getElementById("adminDrop");
 const adminFile = document.getElementById("adminFile");
-adminDrop.onclick = () => adminFile.click();
 adminDrop.ondragover = (e) => { e.preventDefault(); adminDrop.style.background = "#eef"; };
 adminDrop.ondragleave = () => { adminDrop.style.background = "#fff"; };
 adminDrop.ondrop = (e) => {
