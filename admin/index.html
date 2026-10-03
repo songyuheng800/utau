@@ -131,12 +131,12 @@ body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#
     <p><span data-i18n="totalPrefix">共</span> <span id="count">0</span> <span data-i18n="totalSuffix">个文件，删除后不可恢复</span></p>
   </div>
   <div class="stats-row" id="statsRow"></div>
-  <div style="background:#fff;border-radius:16px;padding:16px 20px;margin-bottom:16px;box-shadow:0 4px 20px rgba(74,127,181,0.08);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <input type="file" id="adminFile" style="display:none" accept=".ust,.ustx,.vsq,.vsqx,.vpr,.pp2,.pp3,.zip,.rar">
-    <button class="dl-btn" onclick="document.getElementById('adminFile').click()">选择文件</button>
-    <button class="connect-btn" style="padding:8px 16px;font-size:14px;letter-spacing:0" onclick="adminUpload()">上传</button>
-    <span id="adminUploadStatus" style="font-size:13px;color:#888"></span>
+  <div id="adminDrop" style="border:2px dashed #444;padding:24px;text-align:center;margin:16px 0;border-radius:8px;cursor:pointer;background:#fff">
+    <p style="font-size:14px;color:#555;margin-bottom:10px">拖拽文件到此处上传，或点击选择文件</p>
+    <button style="padding:8px 16px;border:1px solid #888;background:#f7f7f7;border-radius:4px;cursor:pointer;font-size:14px">选择文件</button>
+    <div id="adminUploadStatus" style="font-size:13px;color:#888;margin-top:8px"></div>
   </div>
+  <input type="file" id="adminFile" style="display:none" accept=".ust,.ustx,.vsq,.vsqx,.vpr,.pp2,.pp3,.zip,.rar">
   <input type="text" class="search-box" id="searchBox" data-i18n-ph="searchPh" placeholder="搜索文件名...">
   <div class="file-list" id="fileList">
     <div class="empty" data-i18n="loading">加载中...</div>
@@ -336,6 +336,17 @@ document.getElementById("searchBox").addEventListener("input", (e) => {
   const filtered = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
   renderList(filtered);
 });
+
+const adminDrop = document.getElementById("adminDrop");
+const adminFile = document.getElementById("adminFile");
+adminDrop.onclick = () => adminFile.click();
+adminDrop.ondragover = (e) => { e.preventDefault(); adminDrop.style.background = "#eef"; };
+adminDrop.ondragleave = () => { adminDrop.style.background = "#fff"; };
+adminDrop.ondrop = (e) => {
+  e.preventDefault(); adminDrop.style.background = "#fff";
+  if (e.dataTransfer.files.length > 0) { adminFile.files = e.dataTransfer.files; adminUpload(); }
+};
+adminFile.onchange = () => { if (adminFile.files.length > 0) adminUpload(); };
 
 async function adminUpload() {
   const input = document.getElementById("adminFile");
