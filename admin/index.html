@@ -374,13 +374,16 @@ async function adminUpload() {
     const data = await res.json();
     if (data.ok) {
       status.textContent = "上传成功";
+      status.style.color = "#27ae60";
       input.value = "";
       loadFiles();
     } else {
       status.textContent = "上传失败：" + (data.msg || "");
+      status.style.color = "#c0392b";
     }
   } catch (e) {
     status.textContent = "网络错误：" + e.message;
+    status.style.color = "#c0392b";
   }
 }
 
