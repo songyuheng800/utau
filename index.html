@@ -38,9 +38,9 @@
 <p class="allowed">允许上传：.ust .ustx .vsq .vsqx .vpr .pp2 .pp3 .zip .rar（文件自动加时间戳，不会覆盖已有文件）</p>
 
 <div id="drop" class="upload-area">
-  <p>拖拽文件到此处上传，或点击选择文件</p>
+  <p>拖拽多个文件到此处批量上传，或点击选择多个文件</p>
   <button id="pickBtn" type="button">选择文件</button>
-  <input type="file" id="fileIn">
+  <input type="file" id="fileIn" multiple>
 </div>
 
 <div class="agree-box">
@@ -72,7 +72,7 @@ const msgBox = document.getElementById("msg");
 const MAX_SIZE = 50 * 1024 * 1024; // 与后端 functions/upload.js 的 MAX_RAW_SIZE 保持一致
 const allowExt = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
 
-let selectedFile = null;
+let selectedFiles = [];
 
 /* ---------- 选择文件 ---------- */
 pickBtn.onclick = (e) => { e.stopPropagation(); fileInput.click(); };
@@ -84,21 +84,31 @@ dropArea.ondrop = (e) => {
   dropArea.classList.remove("active");
   if (e.dataTransfer.files.length > 0) {
     fileInput.files = e.dataTransfer.files;
-    selectFile(e.dataTransfer.files[0]);
+    selectFiles(e.dataTransfer.files);
   }
 };
-fileInput.onchange = () => { if (fileInput.files[0]) selectFile(fileInput.files[0]); };
+fileInput.onchange = () => { if (fileInput.files.length > 0) selectFiles(fileInput.files); };
 
-function selectFile(file) {
-  selectedFile = null;
-  const ext = file.name.split(".").pop().toLowerCase();
-  if (!allowExt.includes(ext)) {
-    setMsg("文件类型不允许：" + file.name + "（仅允许 .ust .ustx .vsq .vsqx .vpr .pp2 .pp3 .zip .rar）", "error");
-  } else if (file.size > MAX_SIZE) {
-    setMsg("文件过大：" + file.name + "（上限 " + Math.round(MAX_SIZE / 1024 / 1024) + " MB）", "error");
+function selectFiles(fileList) {
+  selectedFiles = [];
+  const rejected = [];
+  for (const file of fileList) {
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!allowExt.includes(ext)) {
+      rejected.push(file.name + "（类型不允许）");
+    } else if (file.size > MAX_SIZE) {
+      rejected.push(file.name + "（超过 " + Math.round(MAX_SIZE / 1024 / 1024) + " MB）");
+    } else {
+      selectedFiles.push(file);
+    }
+  }
+  if (selectedFiles.length > 0) {
+    const totalSize = selectedFiles.reduce((s, f) => s + f.size, 0);
+    let msg = "已选中 " + selectedFiles.length + " 个文件，共 " + formatSize(totalSize);
+    if (rejected.length > 0) msg += "；已跳过 " + rejected.length + " 个：" + rejected.join("、");
+    setMsg(msg, rejected.length > 0 ? "error" : "ok");
   } else {
-    selectedFile = file;
-    setMsg("已选中文件：" + file.name + "（" + formatSize(file.size) + "）", "ok");
+    setMsg("没有可用的文件：" + rejected.join("、"), "error");
   }
   refreshState();
 }
@@ -116,7 +126,7 @@ function setMsg(text, type) {
 
 /* ---------- 协议勾选：控制上传按钮与下载链接 ---------- */
 function refreshState() {
-  uploadBtn.disabled = !(agreeCheck.checked && selectedFile);
+  uploadBtn.disabled = !(agreeCheck.checked && selectedFiles.length > 0);
   document.querySelectorAll(".download-link").forEach((link) => {
     if (agreeCheck.checked) {
       link.classList.remove("disabled");
@@ -142,29 +152,38 @@ function arrayBufferToBase64(buffer) {
 }
 
 uploadBtn.onclick = async () => {
-  if (!selectedFile || !agreeCheck.checked) return;
+  if (selectedFiles.length === 0 || !agreeCheck.checked) return;
   uploadBtn.disabled = true;
-  setMsg("上传中…文件越大耗时越长，请勿关闭页面", "");
-  try {
-    const base64 = arrayBufferToBase64(await selectedFile.arrayBuffer());
-    const res = await fetch(API_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: selectedFile.name, data: base64 }),
-    });
-    let ret = null;
-    try { ret = await res.json(); } catch (e) { /* 非 JSON 响应 */ }
-    if (ret && ret.ok) {
-      setMsg("上传成功：" + selectedFile.name, "ok");
-      selectedFile = null;
-      fileInput.value = "";
-      loadFileList();
-    } else {
-      setMsg("上传失败：" + (ret && ret.msg ? ret.msg : "HTTP " + res.status), "error");
+  const total = selectedFiles.length;
+  const succeeded = [];
+  const failed = [];
+  for (let i = 0; i < total; i++) {
+    const file = selectedFiles[i];
+    setMsg("上传中… (" + (i + 1) + "/" + total + ")：" + file.name + "，请勿关闭页面", "");
+    try {
+      const base64 = arrayBufferToBase64(await file.arrayBuffer());
+      const res = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, data: base64 }),
+      });
+      let ret = null;
+      try { ret = await res.json(); } catch (e) { /* 非 JSON 响应 */ }
+      if (ret && ret.ok) {
+        succeeded.push(file.name);
+      } else {
+        failed.push(file.name + "（" + (ret && ret.msg ? ret.msg : "HTTP " + res.status) + "）");
+      }
+    } catch (err) {
+      failed.push(file.name + "（网络错误：" + err.message + "）");
     }
-  } catch (err) {
-    setMsg("网络错误：" + err.message, "error");
   }
+  let msg = "完成：成功 " + succeeded.length + " 个";
+  if (failed.length > 0) msg += "，失败 " + failed.length + " 个（" + failed.join("；") + "）";
+  setMsg(msg, failed.length > 0 ? "error" : "ok");
+  selectedFiles = [];
+  fileInput.value = "";
+  loadFileList();
   refreshState();
 };
 
