@@ -83,7 +83,7 @@ function gen() {
   const pwd = pwdInput.value.trim();
   if (!pwd) { setMsg("请先输入管理站密码", "error"); return; }
   genBtn.disabled = true;
-  setMsg("正在生成并同步 Token…", "");
+  setMsg("正在生成并同步 Token…（首次请求需等待 20~40 秒，请勿关闭页面）", "");
   fetch(TOKEN_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
