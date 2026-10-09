@@ -253,9 +253,24 @@ async function handleStats(request, password, env) {
   return json({ ok: true, logs });
 }
 
-/* ---------- 删除文件（管理后台，需密码） ---------- */
+/* ---------- Token 校验（与 functions/token.js 共用同一 KV 绑定 TOKENS） ---------- */
+async function tokenIsValid(token, env) {
+  if (!/^[A-Z0-9]{13}$/.test(token)) return false;
+  if (!env.TOKENS) return false; // 未绑定 KV 时无法跨函数校验，视为无效
+  try {
+    const raw = await env.TOKENS.get(token);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (data.expire && data.expire < Date.now()) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ---------- 删除文件（管理后台，需密码或 Token） ---------- */
 async function handleDelete(request, token, user, repo, env) {
-  // 管理密码：优先读环境变量 ADMIN_PASSWORD，默认 283920
+  // 管理密码：优先读环境变量 ADMIN_PASSWORD，默认 233677
   const ADMIN_PWD = env.ADMIN_PASSWORD || "233677";
 
   let body;
@@ -263,8 +278,10 @@ async function handleDelete(request, token, user, repo, env) {
     return json({ ok: false, msg: "请求体格式错误" }, 400);
   }
 
-  // 校验密码
-  if (body.password !== ADMIN_PWD) {
+  // 校验密码或 Token（支持 13 位数字+大写字母 Token 直登后删除）
+  const pwd = String(body.password || "");
+  const tokenOk = await tokenIsValid(pwd, env);
+  if (pwd !== ADMIN_PWD && !tokenOk) {
     return json({ ok: false, msg: "密码错误" }, 403);
   }
 

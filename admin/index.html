@@ -145,14 +145,15 @@ body{min-height:100vh;background:linear-gradient(160deg,#e8f0f8 0%,#f0f5fa 50%,#
 
 <script>
 const API = "https://utau-4oo.pages.dev/upload";
+const TOKEN_API = "https://utau-4oo.pages.dev/token"; // ★★★ 必改项：你的 Cloudflare Pages 函数地址（functions/token.js 路由）
 const ADMIN_USER = "宋昱衡";
 const ADMIN_PASS = "233677";
 let adminPwd = sessionStorage.getItem("utau_admin_pwd") || "";
 
 const I18N = {
-  zh: { greeting:"请输入管理员凭证以继续", userLabel:"用户名 / Username", userPh:"输入用户名...", passLabel:"密码 / Password", passPh:"输入密码...", connect:"连接", loginErr:"用户名或密码错误", passHint:"密码提示：管理员的身份证后六位", backHome:"← 返回主站", logout:"退出登录", fileMgr:"文件管理", totalPrefix:"共", totalSuffix:"个文件，删除后不可恢复", loading:"加载中...", empty:"暂无文件", delete:"删除", download:"下载", copy:"复制", copied:"已复制", searchPh:"搜索文件名...", confirmDel:"确定删除「", delOk:"已删除", delFail:"删除失败：", netErr:"网络错误：", cat_utau:"UTAU工程", cat_ustx:"OpenUTAU工程", cat_vocaloid:"Vocaloid工程", cat_voicebank:"声库" },
-  ja: { greeting:"管理者認証情報を入力してください", userLabel:"ユーザー名 / Username", userPh:"ユーザー名を入力...", passLabel:"パスワード / Password", passPh:"パスワードを入力...", connect:"接続", loginErr:"ユーザー名またはパスワードが違います", passHint:"パスワードのヒント：管理者の身分証明書の下6桁", backHome:"← ホームに戻る", logout:"ログアウト", fileMgr:"ファイル管理", totalPrefix:"計", totalSuffix:"件、削除は復元不可です", loading:"読み込み中...", empty:"ファイルなし", delete:"削除", download:"ダウンロード", copy:"コピー", copied:"コピー済み", searchPh:"ファイル名を検索...", confirmDel:"「", delOk:"削除しました", delFail:"削除失敗：", netErr:"ネットワークエラー：", cat_utau:"UTAUプロジェクト", cat_ustx:"OpenUTAUプロジェクト", cat_vocaloid:"Vocaloidプロジェクト", cat_voicebank:"ボイスバンク" },
-  en: { greeting:"Enter admin credentials to continue", userLabel:"Username", userPh:"Enter username...", passLabel:"Password", passPh:"Enter password...", connect:"Connect", loginErr:"Invalid username or password", passHint:"Password hint: last 6 digits of admin ID", backHome:"← Back to home", logout:"Log out", fileMgr:"File Manager", totalPrefix:"", totalSuffix:"files total, deletion is permanent", loading:"Loading...", empty:"No files", delete:"Delete", download:"Download", copy:"Copy", copied:"Copied", searchPh:"Search files...", confirmDel:"Are you sure to delete \"", delOk:"Deleted", delFail:"Delete failed: ", netErr:"Network error: ", cat_utau:"UTAU project", cat_ustx:"OpenUTAU project", cat_vocaloid:"Vocaloid project", cat_voicebank:"Voicebank" }
+  zh: { greeting:"请输入管理员凭证以继续", userLabel:"用户名 / Username", userPh:"输入用户名...", passLabel:"密码 / Password", passPh:"输入密码...", connect:"连接", loginErr:"用户名或密码错误", passHint:"密码提示：管理员的身份证后六位；也可直接填入 13 位 Token 登录", backHome:"← 返回主站", logout:"退出登录", fileMgr:"文件管理", totalPrefix:"共", totalSuffix:"个文件，删除后不可恢复", loading:"加载中...", empty:"暂无文件", delete:"删除", download:"下载", copy:"复制", copied:"已复制", searchPh:"搜索文件名...", confirmDel:"确定删除「", delOk:"已删除", delFail:"删除失败：", netErr:"网络错误：", cat_utau:"UTAU工程", cat_ustx:"OpenUTAU工程", cat_vocaloid:"Vocaloid工程", cat_voicebank:"声库" },
+  ja: { greeting:"管理者認証情報を入力してください", userLabel:"ユーザー名 / Username", userPh:"ユーザー名を入力...", passLabel:"パスワード / Password", passPh:"パスワードを入力...", connect:"接続", loginErr:"ユーザー名またはパスワードが違います", passHint:"パスワードのヒント：管理者の身分証明書の下6桁、または13桁のTokenを直接入力", backHome:"← ホームに戻る", logout:"ログアウト", fileMgr:"ファイル管理", totalPrefix:"計", totalSuffix:"件、削除は復元不可です", loading:"読み込み中...", empty:"ファイルなし", delete:"削除", download:"ダウンロード", copy:"コピー", copied:"コピー済み", searchPh:"ファイル名を検索...", confirmDel:"「", delOk:"削除しました", delFail:"削除失敗：", netErr:"ネットワークエラー：", cat_utau:"UTAUプロジェクト", cat_ustx:"OpenUTAUプロジェクト", cat_vocaloid:"Vocaloidプロジェクト", cat_voicebank:"ボイスバンク" },
+  en: { greeting:"Enter admin credentials to continue", userLabel:"Username", userPh:"Enter username...", passLabel:"Password", passPh:"Enter password...", connect:"Connect", loginErr:"Invalid username or password", passHint:"Password hint: last 6 digits of admin ID, or paste a 13-char token directly", backHome:"← Back to home", logout:"Log out", fileMgr:"File Manager", totalPrefix:"", totalSuffix:"files total, deletion is permanent", loading:"Loading...", empty:"No files", delete:"Delete", download:"Download", copy:"Copy", copied:"Copied", searchPh:"Search files...", confirmDel:"Are you sure to delete \"", delOk:"Deleted", delFail:"Delete failed: ", netErr:"Network error: ", cat_utau:"UTAU project", cat_ustx:"OpenUTAU project", cat_vocaloid:"Vocaloid project", cat_voicebank:"Voicebank" }
 };
 
 let lang = localStorage.getItem("utau_admin_lang") || "zh";
@@ -202,6 +203,11 @@ function doLogin() {
   const err = document.getElementById("loginErr");
   err.style.display = "none";
 
+  // Token 直登：密码框直接填 13 位数字+大写字母 Token
+  if (/^[A-Z0-9]{13}$/.test(p)) {
+    return doTokenLogin(p, err);
+  }
+
   const isCorrect = (["admin","宋昱衡","1"].includes(u) && p === ADMIN_PASS);
 
   // 加载文字多语言
@@ -246,6 +252,58 @@ function doLogin() {
       showAdmin();
     }, 1200);
   }, 10000);
+}
+
+/* ---------- Token 直登：密码框填 13 位 Token 时走后端校验 ---------- */
+async function doTokenLogin(token, err) {
+  const overlay = document.getElementById("bootOverlay");
+  const msg = document.getElementById("bootMsg");
+  const bootMsgs = {
+    zh: ["正在核验 Token...","正在初始化...","正在维护主站/副站生态...","服务器接入，准备进入系统...","服务器已启动"],
+    ja: ["Token を確認中...","初期化中...","メイン/サブサイトを維持中...","サーバー接続、システム準備中...","サーバー起動完了"],
+    en: ["Verifying token...","Initializing...","Maintaining main/backup sites...","Server connected, preparing...","Server started"]
+  };
+  const msgs = bootMsgs[lang] || bootMsgs.zh;
+
+  overlay.style.display = "flex";
+  overlay.classList.remove("fade");
+  msg.textContent = msgs[0];
+
+  try {
+    const res = await fetch(TOKEN_API + "?verify=" + encodeURIComponent(token));
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* 非 JSON 响应 */ }
+    if (data && data.ok && data.valid) {
+      // Token 有效：5 步短启动序列
+      const steps = [[0,0],[1200,1],[2400,2],[3600,3],[4800,4]];
+      steps.forEach(([delay, idx]) => {
+        setTimeout(() => { msg.textContent = msgs[idx]; }, delay);
+      });
+      setTimeout(() => {
+        overlay.classList.add("fade");
+        setTimeout(() => {
+          overlay.style.display = "none";
+          adminPwd = token;
+          sessionStorage.setItem("utau_admin_pwd", token);
+          showAdmin();
+        }, 1200);
+      }, 6000);
+    } else {
+      msg.textContent = lang === "zh" ? "Token 无效或已过期" : lang === "ja" ? "Token が無効か期限切れです" : "Invalid or expired token";
+      err.textContent = msg.textContent;
+      setTimeout(() => {
+        overlay.classList.add("fade");
+        setTimeout(() => { overlay.style.display = "none"; err.style.display = "block"; }, 1200);
+      }, 900);
+    }
+  } catch (e) {
+    msg.textContent = lang === "zh" ? "Token 校验失败（网络错误）" : lang === "ja" ? "Token の確認に失敗（ネットワークエラー）" : "Token verification failed (network error)";
+    err.textContent = msg.textContent;
+    setTimeout(() => {
+      overlay.classList.add("fade");
+      setTimeout(() => { overlay.style.display = "none"; err.style.display = "block"; }, 1200);
+    }, 900);
+  }
 }
 
 function showAdmin() {

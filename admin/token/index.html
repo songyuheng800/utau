@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理站 Token 获取 - UTAU 配布站</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23333'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3ET%3C/text%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  body { max-width: 900px; margin: 20px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .allowed { font-size: 14px; color: #666; margin-top: 0; line-height: 1.7; }
+  .card { border: 2px dashed #444; padding: 30px; margin: 20px 0; border-radius: 8px; background: #fcfcfc; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 14px; color: #333; margin-bottom: 8px; font-weight: 500; }
+  input[type=password] { width: 100%; padding: 14px 16px; border: 1.5px solid #e0e0e0; border-radius: 8px; background: #f5f5f5; font-size: 16px; outline: none; }
+  input[type=password]:focus { border-color: #0066cc; background: #fff; }
+  button { padding: 8px 16px; min-height: 44px; cursor: pointer; border: 1px solid #888; background: #f7f7f7; border-radius: 4px; font-size: 14px; }
+  button:hover:not(:disabled) { background: #eee; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .msg { min-height: 20px; font-size: 14px; margin: 10px 0 0; }
+  .msg.error { color: #c00; }
+  .msg.ok { color: #060; }
+  .token-line { display: flex; align-items: center; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+  code { font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: 20px; letter-spacing: 2px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 6px; padding: 10px 14px; user-select: all; word-break: break-all; }
+  .hint { font-size: 14px; color: #888; margin: 8px 0 0; line-height: 1.7; }
+  .nav { font-size: 14px; margin: 24px 0; }
+  a { color: #0066cc; }
+  footer { text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; font-size: 13px; color: #888; line-height: 1.8; }
+  footer .warn { color: #c00; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>管理站 Token 获取</h1>
+<p class="allowed">输入管理站密码，生成 13 位随机 Token（数字 + 大写字母）。Token 生成后会自动同步到管理站，凭 Token 即可直接登录管理后台，无需再输用户名密码。</p>
+
+<div class="card">
+  <div class="field">
+    <label for="pwd">管理站密码</label>
+    <input type="password" id="pwd" placeholder="输入管理站密码..." autocomplete="off">
+  </div>
+  <p><button id="genBtn" type="button">生成 Token</button></p>
+  <p id="msg" class="msg"></p>
+</div>
+
+<div class="card" id="result" style="display:none">
+  <div class="field" style="margin-bottom:0">
+    <label>你的 Token（已同步到管理站）</label>
+    <div class="token-line">
+      <code id="tokenVal"></code>
+      <button id="copyBtn" type="button">复制</button>
+    </div>
+    <p class="hint">有效期 7 天。在 <a href="../">管理后台</a> 的密码框里直接填入这个 Token 即可登录。</p>
+  </div>
+</div>
+
+<p class="nav"><a href="../">← 返回管理后台</a> · <a href="../../">← 返回主站</a></p>
+
+<footer>
+  <div>微信：18946843204</div>
+  <div>QQ：2192465687</div>
+  <div class="warn">没事别打电话和加微信骚扰我，要不然就等着网站拉黑吧，或者一顿骂</div>
+</footer>
+
+<script>
+// ★★★ 必改项：替换为你的 Cloudflare Pages 函数地址，例如 https://utau-4oo.pages.dev/token
+const TOKEN_API = "https://utau-4oo.pages.dev/token";
+const TTL_DAYS = 7; // 与后端 functions/token.js 的 TOKEN_TTL 保持一致
+
+const pwdInput = document.getElementById("pwd");
+const genBtn = document.getElementById("genBtn");
+const copyBtn = document.getElementById("copyBtn");
+const msgBox = document.getElementById("msg");
+const resultBox = document.getElementById("result");
+const tokenVal = document.getElementById("tokenVal");
+
+function setMsg(text, type) {
+  msgBox.textContent = text;
+  msgBox.className = "msg" + (type ? " " + type : "");
+}
+
+function gen() {
+  const pwd = pwdInput.value.trim();
+  if (!pwd) { setMsg("请先输入管理站密码", "error"); return; }
+  genBtn.disabled = true;
+  setMsg("正在生成并同步 Token…", "");
+  fetch(TOKEN_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: pwd }),
+  })
+    .then(async (res) => {
+      let data = null;
+      try { data = await res.json(); } catch (e) { /* 非 JSON 响应 */ }
+      if (data && data.ok) {
+        tokenVal.textContent = data.token;
+        copyBtn.textContent = "复制";
+        resultBox.style.display = "block";
+        const days = data.ttl ? Math.round(data.ttl / 86400) : TTL_DAYS;
+        if (data.storage === "memory") {
+          setMsg("Token 已生成，但后端未配置 KV 存储，Worker 重启后 Token 会失效（请按部署说明绑定 KV）", "error");
+        } else {
+          setMsg("Token 已生成并同步到管理站，有效期 " + days + " 天", "ok");
+        }
+      } else {
+        resultBox.style.display = "none";
+        setMsg((data && data.msg) ? data.msg : "生成失败（HTTP " + res.status + "）", "error");
+      }
+    })
+    .catch((err) => {
+      resultBox.style.display = "none";
+      setMsg("网络错误：" + err.message + "（请检查 TOKEN_API 配置）", "error");
+    })
+    .finally(() => { genBtn.disabled = false; });
+}
+
+genBtn.onclick = gen;
+pwdInput.addEventListener("keydown", (e) => { if (e.key === "Enter") gen(); });
+
+copyBtn.onclick = async () => {
+  const text = tokenVal.textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    copyBtn.textContent = "已复制";
+    setTimeout(() => { copyBtn.textContent = "复制"; }, 1500);
+  } catch (e) {
+    // 剪贴板不可用时的兜底：选中文本让用户手动复制
+    const range = document.createRange();
+    range.selectNodeContents(tokenVal);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    setMsg("复制失败，已为你选中 Token，请按 Ctrl+C / 长按复制", "error");
+  }
+};
+</script>
+</body>
+</html>
