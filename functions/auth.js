@@ -164,13 +164,34 @@ async function sendVerificationEmail(env, to, code) {
 }
 
 /* ---------- 临时 SMTP 诊断（仅调试用，x-diag 头触发，验证后移除） ---------- */
-async function smtpDiag() {
+async function plainAuthProbe(user, pass, to) {
+  const steps = [];
+  const socket = connect({ hostname: "smtp.qq.com", port: 587, secureTransport: "off" });
+  try {
+    const s = new SmtpSession(socket.readable.getReader(), socket.writable.getWriter());
+    steps.push("greet=" + (await s.line(8000)).slice(0, 60));
+    steps.push("EHLO=" + (await s.cmd("EHLO utau.local", [250])).slice(0, 60));
+    steps.push("AUTH=" + (await s.cmd("AUTH LOGIN", [334])).slice(0, 60));
+    steps.push("user=" + (await s.cmd(b64(user), [334])).slice(0, 60));
+    steps.push("pass=" + (await s.cmd(b64(pass), [235])).slice(0, 60));
+    steps.push("MAIL=" + (await s.cmd("MAIL FROM:<" + user + ">", [250])).slice(0, 60));
+    steps.push("RCPT=" + (await s.cmd("RCPT TO:<" + to + ">", [250, 251])).slice(0, 60));
+    steps.push("DATA=" + (await s.cmd("DATA", [354])).slice(0, 60));
+    await s.writer.write(new TextEncoder().encode("Subject: diag\r\n\r\ndiag\r\n.\r\n"));
+    steps.push("body=" + (await s.line(10000)).slice(0, 60));
+    steps.push("QUIT=" + (await s.cmd("QUIT", [221])).slice(0, 60));
+  } catch (e) {
+    steps.push("error=" + e.message);
+  } finally {
+    try { socket.close(); } catch (e) {}
+  }
+  return steps;
+}
+
+async function smtpDiag(env) {
   const probes = [
-    { hostname: "smtp.qq.com", port: 465, st: "on" },
-    { hostname: "smtp.qq.com", port: 587, st: "off" },
-    { hostname: "smtp.qq.com", port: 25, st: "off" },
-    { hostname: "1.1.1.1", port: 443, st: "on" },
-    { hostname: "smtp.163.com", port: 465, st: "on" },
+    { hostname: "smtp.qq.com", port: 587, st: "starttls" },
+    { hostname: "smtp.qq.com", port: 465, st: "off" },
   ];
   const results = [];
   for (const p of probes) {
@@ -188,6 +209,7 @@ async function smtpDiag() {
     }
     results.push(r);
   }
+  results.push({ hostname: "smtp.qq.com", port: 587, st: "off-plain-auth", auth: await plainAuthProbe(env.SMTP_USER || "", env.SMTP_PASS || "", env.SMTP_USER || "") });
   return results;
 }
 
@@ -298,7 +320,7 @@ export async function onRequest(context) {
       return json({ ok: false, msg: "请求体不是合法的 JSON" }, 400);
     }
     if (action === "smtpdiag" && request.headers.get("x-diag") === "utau-diag-2026") {
-      return json({ ok: true, probes: await smtpDiag() });
+      return json({ ok: true, probes: await smtpDiag(env) });
     }
     if (action === "sendcode") return handleSendCode(body, kv, env);
     if (action === "register") return handleRegister(body, kv);
