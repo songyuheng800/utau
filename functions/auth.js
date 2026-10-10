@@ -130,7 +130,7 @@ async function sendVerificationEmail(env, to, code) {
   const pass = env.SMTP_PASS;
   if (!user || !pass) throw new Error("SMTP 未配置（SMTP_USER / SMTP_PASS）");
 
-  const socket = connect({ hostname: host, port, tls: true });
+  const socket = connect({ hostname: host, port, secureTransport: "on" }); // 隐式 TLS（cloudflare:sockets 用 secureTransport，不是 tls）
   const step = async (label, p) => {
     try { return await p; } catch (e) { throw new Error(label + "：" + e.message); }
   };
