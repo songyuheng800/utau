@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UTAU 配布站 · GitHub 登录</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231d1d1f'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23f5c542' font-family='Arial' font-weight='900'%3EU%3C/text%3E%3C/svg%3E">
+<style>
+  :root{--bg:#121214;--card:#1d1d1f;--card2:#242426;--line:#333336;--txt:#e8e8ea;--dim:#8b8b90;--red:#e02424;--gold:#f5c542;--gh:#f0f6fc;}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  .top{height:60px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--line);background:var(--card)}
+  .top .logo{font-weight:900;font-size:20px;color:var(--gold);letter-spacing:.5px}
+  .top .logo span{color:var(--dim);font-weight:400;font-size:13px;margin-left:10px}
+  .top a.back{margin-left:auto;color:var(--dim);text-decoration:none;font-size:13px}
+  .top a.back:hover{color:var(--txt)}
+  main{flex:1;display:flex;align-items:center;justify-content:center;padding:30px 16px}
+  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px 28px;text-align:center}
+  .badge{display:inline-block;font-size:12px;color:var(--gold);border:1px solid var(--gold);border-radius:20px;padding:3px 12px;margin-bottom:18px;opacity:.9}
+  h1{font-size:22px;margin-bottom:6px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:28px;line-height:1.6}
+  .notice{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--dim);margin-bottom:24px;line-height:1.6;text-align:left}
+  .gh-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#21262d;color:var(--gh);border:1px solid #454c55;border-radius:10px;padding:14px 0;font-size:15px;font-weight:600;cursor:pointer;transition:.15s;text-decoration:none}
+  .gh-btn:hover{background:#30363d;border-color:#565d66}
+  .gh-btn svg{width:20px;height:20px}
+  .tip{margin-top:20px;font-size:12px;color:var(--dim);line-height:1.7}
+  .tip b{color:var(--txt);font-weight:600}
+  .avatar{width:76px;height:76px;border-radius:50%;border:2px solid var(--gold);margin:6px auto 14px;display:block;object-fit:cover}
+  .uname{font-size:20px;font-weight:700}
+  .ulogin{color:var(--dim);font-size:13px;margin:4px 0 6px}
+  .ustat{display:inline-block;font-size:12px;color:#3fb950;border:1px solid #3fb950;border-radius:20px;padding:2px 10px;margin-top:4px}
+  .logout-btn{margin-top:26px;background:transparent;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:10px 0;width:100%;cursor:pointer;font-size:14px;transition:.15s}
+  .logout-btn:hover{color:var(--red);border-color:var(--red)}
+  .msg{margin-bottom:18px;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;display:none;text-align:left}
+  .msg.ok{display:block;background:rgba(63,185,80,.08);border:1px solid #3fb950;color:#3fb950}
+  .msg.err{display:block;background:rgba(224,36,36,.08);border:1px solid var(--red);color:#ff7b72}
+  .msg.info{display:block;background:rgba(139,139,144,.08);border:1px solid var(--dim);color:var(--dim)}
+  footer{border-top:1px solid var(--line);padding:16px 20px;text-align:center;font-size:12px;color:var(--dim);background:var(--card);line-height:1.8}
+  footer b{color:var(--red);font-weight:600}
+  footer .sep{color:var(--line);margin:0 6px}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">UTAU<span>配布站登录</span></div>
+    <a class="back" href="https://songyuheng800.github.io/utau/">← 返回配布站</a>
+  </div>
+
+  <main>
+    <div class="card">
+      <div class="badge">GitHub 授权登录</div>
+      <h1 id="title">登录 UTAU 配布站</h1>
+      <p class="sub" id="sub">使用你的 GitHub 账号一键登录<br>本站与 utau-4oo.pages.dev 主站不关联，仅独立测试用</p>
+
+      <div id="msgBox"></div>
+
+      <div id="viewGuest">
+        <a class="gh-btn" href="https://utau-catbox-test.pages.dev/api/oauth/start" id="loginBtn">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          <span>使用 GitHub 登录</span>
+        </a>
+        <div class="tip">
+          <b>登录说明：</b>点击后将跳转到 GitHub 授权页，<br>确认授权后自动回到本站。<br>登录状态有效期 7 天。
+        </div>
+      </div>
+
+      <div id="viewUser" class="hidden">
+        <img class="avatar" id="uAvatar" alt="">
+        <div class="uname" id="uName">—</div>
+        <div class="ulogin" id="uLogin">@—</div>
+        <div><span class="ustat">已登录</span></div>
+        <button class="logout-btn" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <b>★ 配布禁止 · 转载注明出处 ★</b><br>
+    微信：18946843204<span class="sep">|</span>QQ：2192465687
+  </footer>
+
+<script>
+(function(){
+  const API = "https://utau-catbox-test.pages.dev/api/oauth";
+  const $ = (id) => document.getElementById(id);
+  const msgBox = $("msgBox");
+  const showMsg = (type, text) => {
+    msgBox.className = "msg " + type;
+    msgBox.textContent = text;
+  };
+
+  const p = new URLSearchParams(location.search);
+  if (p.get("ok") === "1") showMsg("ok", "登录成功！欢迎回来。");
+  else if (p.get("logout") === "1") showMsg("info", "你已退出登录。");
+  else if (p.get("err")) showMsg("err", "登录失败：" + decodeURIComponent(p.get("err")));
+
+  fetch(API + "/me", { credentials: "include" })
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.logged_in && d.user) {
+        $("viewGuest").classList.add("hidden");
+        $("viewUser").classList.remove("hidden");
+        $("uAvatar").src = d.user.avatar || "";
+        $("uName").textContent = d.user.name || d.user.gh_login;
+        $("uLogin").textContent = "@" + d.user.gh_login;
+        $("title").textContent = "欢迎，" + (d.user.name || d.user.gh_login);
+        $("sub").textContent = "当前以 GitHub 账号登录本站";
+      }
+    })
+    .catch(() => {});
+
+  $("logoutBtn").addEventListener("click", () => {
+    location.href = API + "/logout";
+  });
+})();
+</script>
+</body>
+</html>
