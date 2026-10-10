@@ -110,11 +110,15 @@ class SmtpSession {
       this.buf += new TextDecoder().decode(value);
     }
   }
-  async cmd(cmd, expected, ms = 15000) {
+  async cmd(cmd, expected, ms = 20000) {
     await this.writer.write(new TextEncoder().encode(cmd + "\r\n"));
-    const resp = await this.line(ms);
+    let resp = await this.line(ms);
+    // 多行响应：形如 "250-xxx\r\n250 yyy"，续行以 "-" 结尾，读到最终行（空格分隔）为止
+    while (resp.length >= 4 && resp[3] === "-") {
+      resp = await this.line(ms);
+    }
     const code = parseInt(resp.slice(0, 3), 10);
-    if (!expected.includes(code)) throw new Error("SMTP 错误 " + code + ": " + resp);
+    if (!expected.includes(code)) throw new Error("SMTP 错误 " + code + "（命令 " + cmd.split(" ")[0] + "）: " + resp);
     return resp;
   }
 }
