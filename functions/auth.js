@@ -164,13 +164,15 @@ async function sendVerificationEmail(env, to, code) {
 }
 
 /* ---------- 临时 SMTP 诊断（仅调试用，x-diag 头触发，验证后移除） ---------- */
-async function plainAuthProbe(user, pass, to) {
+async function starttlsAuthProbe(user, pass, to) {
   const steps = [];
-  const socket = connect({ hostname: "smtp.qq.com", port: 587, secureTransport: "off" });
+  const socket = connect({ hostname: "smtp.qq.com", port: 587, secureTransport: "starttls" });
   try {
     const s = new SmtpSession(socket.readable.getReader(), socket.writable.getWriter());
     steps.push("greet=" + (await s.line(8000)).slice(0, 60));
-    steps.push("EHLO=" + (await s.cmd("EHLO utau.local", [250])).slice(0, 60));
+    steps.push("EHLO1=" + (await s.cmd("EHLO utau.local", [250])).slice(0, 60));
+    steps.push("STARTTLS=" + (await s.cmd("STARTTLS", [220])).slice(0, 60));
+    steps.push("EHLO2=" + (await s.cmd("EHLO utau.local", [250])).slice(0, 60));
     steps.push("AUTH=" + (await s.cmd("AUTH LOGIN", [334])).slice(0, 60));
     steps.push("user=" + (await s.cmd(b64(user), [334])).slice(0, 60));
     steps.push("pass=" + (await s.cmd(b64(pass), [235])).slice(0, 60));
@@ -189,27 +191,8 @@ async function plainAuthProbe(user, pass, to) {
 }
 
 async function smtpDiag(env) {
-  const probes = [
-    { hostname: "smtp.qq.com", port: 587, st: "starttls" },
-    { hostname: "smtp.qq.com", port: 465, st: "off" },
-  ];
   const results = [];
-  for (const p of probes) {
-    const r = { ...p };
-    let socket;
-    try {
-      socket = connect({ hostname: p.hostname, port: p.port, secureTransport: p.st });
-      const s = new SmtpSession(socket.readable.getReader(), socket.writable.getWriter());
-      const line = await s.line(8000);
-      r.greeting = line.slice(0, 100);
-    } catch (e) {
-      r.error = e.message;
-    } finally {
-      try { if (socket) socket.close(); } catch (e) {}
-    }
-    results.push(r);
-  }
-  results.push({ hostname: "smtp.qq.com", port: 587, st: "off-plain-auth", auth: await plainAuthProbe(env.SMTP_USER || "", env.SMTP_PASS || "", env.SMTP_USER || "") });
+  results.push({ hostname: "smtp.qq.com", port: 587, st: "starttls-auth", auth: await starttlsAuthProbe(env.SMTP_USER || "", env.SMTP_PASS || "", env.SMTP_USER || "") });
   return results;
 }
 
