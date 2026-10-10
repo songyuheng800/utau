@@ -11,8 +11,9 @@
  * 部署位置：Cloudflare Pages 项目的 functions/ 目录（functions/auth.js）
  * 函数路由：https://<你的项目名>.pages.dev/auth
  *
- * 存储：复用 KV 绑定 TOKENS（与 functions/token.js 同一个 namespace），
- *       键前缀 auth_user: / auth_code: / auth_session: / auth_rl:，互不冲突。
+ * 存储：独立 KV 绑定 AUTH_KV（命名空间 UTAU_AUTH，与主站 UTAU_TOKENS 完全隔离），
+ *       键前缀 auth_user: / auth_code: / auth_session: / auth_rl:。
+ *       未绑定 AUTH_KV 时兜底使用 TOKENS（不推荐，仅过渡）。
  *
  * 环境变量（Pages 项目 → Settings → Environment variables → Production）：
  *   SMTP_USER  发信邮箱（QQ 邮箱地址，如 2192465687@qq.com）
@@ -244,9 +245,9 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  const kv = env.TOKENS;
+  const kv = env.AUTH_KV || env.TOKENS;
   if (!kv) {
-    return json({ ok: false, msg: "KV 未绑定（TOKENS）" }, 500);
+    return json({ ok: false, msg: "KV 未绑定（AUTH_KV）" }, 500);
   }
 
   const url = new URL(request.url);
