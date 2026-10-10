@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猫盒测试站 - UTAU 配布站</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23333'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3EU%3C/text%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  body { max-width: 900px; margin: 20px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .test-badge { display: inline-block; font-size: 12px; color: #fff; background: #c0392b; border-radius: 3px; padding: 2px 8px; vertical-align: middle; margin-left: 8px; }
+  .allowed { font-size: 14px; color: #666; margin-top: 0; }
+  .upload-area { border: 2px dashed #444; padding: 30px; text-align: center; margin: 20px 0; border-radius: 8px; cursor: pointer; }
+  .upload-area.active { background: #eef; border-color: #0066cc; }
+  input[type=file] { display: none; }
+  button { padding: 8px 16px; min-height: 44px; cursor: pointer; border: 1px solid #888; background: #f7f7f7; border-radius: 4px; font-size: 14px; }
+  button:hover:not(:disabled) { background: #eee; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .file-list { margin-top: 30px; }
+  .file-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #eee; }
+  .file-item .name { flex: 1; word-break: break-all; font-size: 14px; }
+  a { color: #0066cc; }
+  .empty { color: #999; font-size: 13px; padding: 6px 0; }
+  .msg { min-height: 20px; font-size: 14px; }
+  .msg.error { color: #c00; }
+  .msg.ok { color: #060; }
+  .note { font-size: 13px; color: #666; border: 1px dashed #bbb; padding: 10px 12px; border-radius: 4px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<h1>猫盒（Catbox）测试站 <span class="test-badge">测试中</span></h1>
+<p class="allowed">允许上传：.ust .ustx .vsq .vsqx .vpr .pp2 .pp3 .zip .rar（单文件上限 100 MB，永久保存）</p>
+
+<div id="drop" class="upload-area">
+  <p>拖拽文件到此处上传，或点击选择文件（单文件，先测一个）</p>
+  <button id="pickBtn" type="button">选择文件</button>
+  <input type="file" id="fileIn">
+</div>
+
+<p><button id="uploadBtn" type="button" disabled>上传到猫盒</button></p>
+<p id="msg" class="msg"></p>
+
+<div class="file-list">
+  <h2>已上传文件（猫盒直链）</h2>
+  <div id="list"></div>
+</div>
+
+<div class="note">
+  <b>测试站说明：</b>文件经 Cloudflare 函数转发到 catbox.moe（匿名、永久、无需账号与银行卡）。<br>
+  删除按钮仅移除本站列表记录；<b>匿名上传到猫盒的文件本身无法通过 API 删除</b>（需要猫盒账号 userhash 才能真正删除）。<br>
+  满意后移植到主站时，如需“真删除”，注册一个猫盒账号（免费）拿到 userhash，我可以加上。
+</div>
+
+<script>
+const API_ENDPOINT = "https://utau-4oo.pages.dev/api/test-catbox/upload";
+const MAX_SIZE = 100 * 1024 * 1024;
+const allowExt = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
+
+const fileInput = document.getElementById("fileIn");
+const pickBtn = document.getElementById("pickBtn");
+const dropArea = document.getElementById("drop");
+const uploadBtn = document.getElementById("uploadBtn");
+const msgBox = document.getElementById("msg");
+
+let selectedFile = null;
+
+pickBtn.onclick = (e) => { e.stopPropagation(); fileInput.click(); };
+dropArea.onclick = () => fileInput.click();
+dropArea.ondragover = (e) => { e.preventDefault(); dropArea.classList.add("active"); };
+dropArea.ondragleave = () => dropArea.classList.remove("active");
+dropArea.ondrop = (e) => {
+  e.preventDefault();
+  dropArea.classList.remove("active");
+  if (e.dataTransfer.files.length > 0) {
+    fileInput.files = e.dataTransfer.files;
+    selectFile(e.dataTransfer.files[0]);
+  }
+};
+fileInput.onchange = () => { if (fileInput.files.length > 0) selectFile(fileInput.files[0]); };
+
+function selectFile(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (!allowExt.includes(ext)) {
+    selectedFile = null;
+    setMsg(file.name + "（类型不允许）", "error");
+  } else if (file.size > MAX_SIZE) {
+    selectedFile = null;
+    setMsg(file.name + "（超过 100 MB）", "error");
+  } else {
+    selectedFile = file;
+    setMsg("已选择：" + file.name + "（" + formatSize(file.size) + "）", "ok");
+  }
+  uploadBtn.disabled = !selectedFile;
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function setMsg(text, type) {
+  msgBox.textContent = text;
+  msgBox.className = "msg" + (type ? " " + type : "");
+}
+
+uploadBtn.onclick = async () => {
+  if (!selectedFile) return;
+  uploadBtn.disabled = true;
+  setMsg("上传中… " + selectedFile.name + "，请勿关闭页面", "");
+  try {
+    const fd = new FormData();
+    fd.append("fileToUpload", selectedFile);
+    const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
+    let ret = null;
+    try { ret = await res.json(); } catch (e) { /* 非 JSON */ }
+    if (ret && ret.ok) {
+      setMsg("上传成功：" + selectedFile.name + "\n直链：" + ret.url, "ok");
+      loadList();
+    } else {
+      setMsg("上传失败：" + ((ret && ret.msg) || ("HTTP " + res.status)), "error");
+    }
+  } catch (err) {
+    setMsg("网络错误：" + err.message, "error");
+  }
+  selectedFile = null;
+  fileInput.value = "";
+  uploadBtn.disabled = true;
+};
+
+async function loadList() {
+  try {
+    const res = await fetch(API_ENDPOINT);
+    const data = await res.json();
+    renderList((data && data.files) ? data.files : []);
+  } catch (err) {
+    setMsg("加载列表失败：" + err.message, "error");
+  }
+}
+
+function renderList(files) {
+  const container = document.getElementById("list");
+  container.innerHTML = "";
+  if (files.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "暂无文件";
+    container.appendChild(empty);
+    return;
+  }
+  files.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "file-item";
+
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = item.name;
+    name.title = item.name + "\n" + item.time;
+
+    const link = document.createElement("a");
+    link.href = item.url;
+    link.textContent = "下载";
+    link.target = "_blank";
+    link.rel = "noopener";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.textContent = "复制直链";
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(item.url);
+        copyBtn.textContent = "已复制";
+        setTimeout(() => { copyBtn.textContent = "复制直链"; }, 1500);
+      } catch (e) {
+        setMsg("复制失败，请手动复制链接", "error");
+      }
+    };
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.textContent = "删除记录";
+    delBtn.onclick = async () => {
+      if (!confirm("确定从列表移除 " + item.name + "？（猫盒上的文件本体无法删除）")) return;
+      const res = await fetch(API_ENDPOINT, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id }),
+      });
+      const ret = await res.json();
+      setMsg(ret && ret.ok ? "已移除记录" : "删除失败", ret && ret.ok ? "ok" : "error");
+      loadList();
+    };
+
+    row.appendChild(name);
+    row.appendChild(link);
+    row.appendChild(copyBtn);
+    row.appendChild(delBtn);
+    container.appendChild(row);
+  });
+}
+
+loadList();
+</script>
+<div style="text-align:center;margin-top:40px;padding-top:16px;border-top:1px solid #eee;font-size:13px;color:#888;line-height:1.8">
+  <div>微信：18946843204</div>
+  <div>QQ：2192465687</div>
+  <div style="margin-top:8px;color:#c00;font-size:12px">没事别打电话和加微信骚扰我，要不然就等着网站拉黑吧，或者一顿骂</div>
+</div>
+</body>
+</html>
