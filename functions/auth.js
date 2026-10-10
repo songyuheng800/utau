@@ -163,6 +163,34 @@ async function sendVerificationEmail(env, to, code) {
   }
 }
 
+/* ---------- 临时 SMTP 诊断（仅调试用，x-diag 头触发，验证后移除） ---------- */
+async function smtpDiag() {
+  const probes = [
+    { hostname: "smtp.qq.com", port: 465, st: "on" },
+    { hostname: "smtp.qq.com", port: 587, st: "off" },
+    { hostname: "smtp.qq.com", port: 25, st: "off" },
+    { hostname: "1.1.1.1", port: 443, st: "on" },
+    { hostname: "smtp.163.com", port: 465, st: "on" },
+  ];
+  const results = [];
+  for (const p of probes) {
+    const r = { ...p };
+    let socket;
+    try {
+      socket = connect({ hostname: p.hostname, port: p.port, secureTransport: p.st });
+      const s = new SmtpSession(socket.readable.getReader(), socket.writable.getWriter());
+      const line = await s.line(8000);
+      r.greeting = line.slice(0, 100);
+    } catch (e) {
+      r.error = e.message;
+    } finally {
+      try { if (socket) socket.close(); } catch (e) {}
+    }
+    results.push(r);
+  }
+  return results;
+}
+
 /* ---------- 各操作处理 ---------- */
 async function handleSendCode(body, kv, env) {
   const email = String(body.email || "").trim().toLowerCase();
@@ -268,6 +296,9 @@ export async function onRequest(context) {
     let body;
     try { body = await request.json(); } catch (e) {
       return json({ ok: false, msg: "请求体不是合法的 JSON" }, 400);
+    }
+    if (action === "smtpdiag" && request.headers.get("x-diag") === "utau-diag-2026") {
+      return json({ ok: true, probes: await smtpDiag() });
     }
     if (action === "sendcode") return handleSendCode(body, kv, env);
     if (action === "register") return handleRegister(body, kv);
