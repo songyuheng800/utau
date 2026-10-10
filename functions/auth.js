@@ -131,16 +131,19 @@ async function sendVerificationEmail(env, to, code) {
   if (!user || !pass) throw new Error("SMTP 未配置（SMTP_USER / SMTP_PASS）");
 
   const socket = connect({ hostname: host, port, tls: true });
+  const step = async (label, p) => {
+    try { return await p; } catch (e) { throw new Error(label + "：" + e.message); }
+  };
   try {
     const s = new SmtpSession(socket.readable.getReader(), socket.writable.getWriter());
-    await s.line(); // 220 服务就绪
-    await s.cmd("EHLO utau.local", [250]);
-    await s.cmd("AUTH LOGIN", [334]);
-    await s.cmd(b64(user), [334]);
-    await s.cmd(b64(pass), [235]); // 235 认证成功
-    await s.cmd("MAIL FROM:<" + user + ">", [250]);
-    await s.cmd("RCPT TO:<" + to + ">", [250, 251]);
-    await s.cmd("DATA", [354]);
+    await step("连接问候", s.line()); // 220 服务就绪
+    await step("EHLO", s.cmd("EHLO utau.local", [250]));
+    await step("AUTH LOGIN", s.cmd("AUTH LOGIN", [334]));
+    await step("发送用户名", s.cmd(b64(user), [334]));
+    await step("发送授权码", s.cmd(b64(pass), [235])); // 235 认证成功
+    await step("MAIL FROM", s.cmd("MAIL FROM:<" + user + ">", [250]));
+    await step("RCPT TO", s.cmd("RCPT TO:<" + to + ">", [250, 251]));
+    await step("DATA", s.cmd("DATA", [354]));
 
     const subject = "UTAU 配布站注册验证码";
     const text = "你的 UTAU / OpenUTAU 工程配布站注册验证码是：" + code + "\n\n验证码 10 分钟内有效，请勿泄露给他人。\n如果不是你本人操作，请忽略本邮件。";
@@ -153,8 +156,8 @@ async function sendVerificationEmail(env, to, code) {
       "Content-Transfer-Encoding: base64\r\n\r\n" +
       b64u(text) + "\r\n.\r\n";
     await s.writer.write(new TextEncoder().encode(body));
-    await s.line(15000); // 250 邮件已接收
-    await s.cmd("QUIT", [221]);
+    await step("邮件送达确认", s.line(15000)); // 250 邮件已接收
+    await step("QUIT", s.cmd("QUIT", [221]));
   } finally {
     try { socket.close(); } catch (e) { /* 忽略 */ }
   }
