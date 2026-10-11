@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UTAU 配布站 · GitHub 登录</title>
+<title>UTAU 配布站 · 登录</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231d1d1f'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23f5c542' font-family='Arial' font-weight='900'%3EU%3C/text%3E%3C/svg%3E">
 <style>
   :root{--bg:#121214;--card:#1d1d1f;--card2:#242426;--line:#333336;--txt:#e8e8ea;--dim:#8b8b90;--red:#e02424;--gold:#f5c542;--gh:#f0f6fc;}
@@ -15,27 +15,39 @@
   .top a.back{margin-left:auto;color:var(--dim);text-decoration:none;font-size:13px}
   .top a.back:hover{color:var(--txt)}
   main{flex:1;display:flex;align-items:center;justify-content:center;padding:30px 16px}
-  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px 28px;text-align:center}
-  .badge{display:inline-block;font-size:12px;color:var(--gold);border:1px solid var(--gold);border-radius:20px;padding:3px 12px;margin-bottom:18px;opacity:.9}
+  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 28px;text-align:center}
+  .badge{display:inline-block;font-size:12px;color:var(--gold);border:1px solid var(--gold);border-radius:20px;padding:3px 12px;margin-bottom:16px;opacity:.9}
   h1{font-size:22px;margin-bottom:6px}
-  .sub{color:var(--dim);font-size:13px;margin-bottom:28px;line-height:1.6}
-  .notice{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--dim);margin-bottom:24px;line-height:1.6;text-align:left}
-  .gh-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#21262d;color:var(--gh);border:1px solid #454c55;border-radius:10px;padding:14px 0;font-size:15px;font-weight:600;cursor:pointer;transition:.15s;text-decoration:none}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:22px;line-height:1.6}
+  .gh-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#21262d;color:var(--gh);border:1px solid #454c55;border-radius:10px;padding:12px 0;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;text-decoration:none;margin-bottom:10px}
   .gh-btn:hover{background:#30363d;border-color:#565d66}
-  .gh-btn svg{width:20px;height:20px}
-  .ggl{background:#fff;color:#1f1f1f;border:1px solid #dadce0;margin-top:12px}
-  .ggl:hover{background:#f8f9fa;border-color:#d2d3d5}
-  .divider{display:flex;align-items:center;gap:10px;margin:16px 0 0;color:var(--dim);font-size:12px}
+  .gh-btn svg{width:19px;height:19px;flex-shrink:0}
+  .gh-btn.ggl{background:#fff;color:#1f1f1f;border:1px solid #dadce0}
+  .gh-btn.ggl:hover{background:#f8f9fa}
+  .gh-btn.dsc{background:#5865f2;color:#fff;border-color:#5865f2}
+  .gh-btn.dsc:hover{background:#4752c4;border-color:#4752c4}
+  .gh-btn.glb{background:#fc6d26;color:#fff;border-color:#fc6d26}
+  .gh-btn.glb:hover{background:#e24329;border-color:#e24329}
+  .divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--dim);font-size:12px}
   .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
-  .tip{margin-top:20px;font-size:12px;color:var(--dim);line-height:1.7}
+  .pwd-box{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:16px 14px;margin-top:2px}
+  .pwd-box input{width:100%;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:10px 12px;font-size:14px;margin-bottom:10px;outline:none}
+  .pwd-box input:focus{border-color:var(--gold)}
+  .pwd-actions{display:flex;gap:8px}
+  .pwd-btn{flex:1;border-radius:8px;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--txt);transition:.15s}
+  .pwd-btn:hover{border-color:var(--dim)}
+  .pwd-btn.primary{background:var(--gold);color:#1a1a1a;border-color:var(--gold)}
+  .pwd-btn.primary:hover{opacity:.9}
+  .pwd-hint{font-size:11px;color:var(--dim);margin-top:8px;text-align:left;line-height:1.5}
+  .tip{margin-top:16px;font-size:12px;color:var(--dim);line-height:1.7}
   .tip b{color:var(--txt);font-weight:600}
   .avatar{width:76px;height:76px;border-radius:50%;border:2px solid var(--gold);margin:6px auto 14px;display:block;object-fit:cover}
-  .uname{font-size:20px;font-weight:700}
-  .ulogin{color:var(--dim);font-size:13px;margin:4px 0 6px}
+  .uname{font-size:20px;font-weight:700;word-break:break-all}
+  .ulogin{color:var(--dim);font-size:13px;margin:4px 0 6px;word-break:break-all}
   .ustat{display:inline-block;font-size:12px;color:#3fb950;border:1px solid #3fb950;border-radius:20px;padding:2px 10px;margin-top:4px}
-  .logout-btn{margin-top:26px;background:transparent;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:10px 0;width:100%;cursor:pointer;font-size:14px;transition:.15s}
+  .logout-btn{margin-top:24px;background:transparent;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:10px 0;width:100%;cursor:pointer;font-size:14px;transition:.15s}
   .logout-btn:hover{color:var(--red);border-color:var(--red)}
-  .msg{margin-bottom:18px;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;display:none;text-align:left}
+  .msg{margin-bottom:16px;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;display:none;text-align:left}
   .msg.ok{display:block;background:rgba(63,185,80,.08);border:1px solid #3fb950;color:#3fb950}
   .msg.err{display:block;background:rgba(224,36,36,.08);border:1px solid var(--red);color:#ff7b72}
   .msg.info{display:block;background:rgba(139,139,144,.08);border:1px solid var(--dim);color:var(--dim)}
@@ -55,29 +67,31 @@
     <div class="card">
       <div class="badge">OAuth 授权登录</div>
       <h1 id="title">登录 UTAU 配布站</h1>
-      <p class="sub" id="sub">使用 GitHub 或 Google 账号一键登录<br>本站与 utau-4oo.pages.dev 主站不关联，仅独立测试用</p>
+      <p class="sub" id="sub">多平台一键登录，或使用本站账号密码<br>本站与 utau-4oo.pages.dev 主站不关联，仅独立测试用</p>
 
       <div id="msgBox"></div>
 
       <div id="viewGuest">
-        <a class="gh-btn" href="https://utau-catbox-test.pages.dev/api/oauth/start" id="loginBtn">
-          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-          <span>使用 GitHub 登录</span>
-        </a>
-        <div class="divider"><span>或</span></div>
-        <a class="gh-btn ggl" href="https://utau-catbox-test.pages.dev/api/oauth/google/start" id="googleBtn">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-          <span>使用 Google 登录</span>
-        </a>
+        <div id="oauthBtns"></div>
+        <div class="divider"><span>或使用账号密码</span></div>
+        <div class="pwd-box">
+          <input type="text" id="pwdUser" placeholder="用户名（2-20 位，字母数字下划线中文）" autocomplete="username">
+          <input type="password" id="pwdPass" placeholder="密码（至少 6 位）" autocomplete="current-password">
+          <div class="pwd-actions">
+            <button class="pwd-btn primary" id="pwdLoginBtn">登 录</button>
+            <button class="pwd-btn" id="pwdRegBtn">注 册</button>
+          </div>
+          <div class="pwd-hint">注册后自动登录；密码经加盐哈希存储，7 天免登录。</div>
+        </div>
         <div class="tip">
-          <b>登录说明：</b>点击后将跳转到对应平台授权页，<br>确认授权后自动回到本站。<br>登录状态有效期 7 天。
+          <b>说明：</b>第三方登录点击后跳转对应平台授权，<br>确认后自动回到本站。
         </div>
       </div>
 
       <div id="viewUser" class="hidden">
         <img class="avatar" id="uAvatar" alt="">
         <div class="uname" id="uName">—</div>
-        <div class="ulogin" id="uLogin">@—</div>
+        <div class="ulogin" id="uLogin"></div>
         <div><span class="ustat">已登录</span></div>
         <button class="logout-btn" id="logoutBtn">退出登录</button>
       </div>
@@ -91,7 +105,7 @@
 
 <script>
 (function(){
-  const API = "https://utau-catbox-test.pages.dev/api/oauth";
+  const API = "https://utau-catbox-test.pages.dev/api";
   const $ = (id) => document.getElementById(id);
   const msgBox = $("msgBox");
   const showMsg = (type, text) => {
@@ -104,23 +118,97 @@
   else if (p.get("logout") === "1") showMsg("info", "你已退出登录。");
   else if (p.get("err")) showMsg("err", "登录失败：" + decodeURIComponent(p.get("err")));
 
-  fetch(API + "/me", { credentials: "include" })
+  const BTNS = {
+    github: { name: "GitHub", cls: "", href: API + "/oauth/start", icon: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>' },
+    google: { name: "Google", cls: "ggl", href: API + "/oauth/google/start", icon: '<svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>' },
+    discord: { name: "Discord", cls: "dsc", href: API + "/oauth/discord/start", icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.6 1.26a18.27 18.27 0 0 0-5.5 0 12.6 12.6 0 0 0-.61-1.26.08.08 0 0 0-.08-.04 19.75 19.75 0 0 0-4.88 1.52.07.07 0 0 0-.04.03C.53 9.05-.32 13.58.1 18.06c0 .02.01.04.03.05a19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.22-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.12c.13-.1.25-.2.37-.3a.07.07 0 0 1 .08-.01c3.94 1.8 8.2 1.8 12.08 0a.07.07 0 0 1 .08.01c.12.1.25.2.37.3a.08.08 0 0 1-.01.12c-.6.35-1.22.64-1.87.9a.08.08 0 0 0-.04.11c.35.7.76 1.37 1.22 2a.08.08 0 0 0 .08.03 19.84 19.84 0 0 0 6.01-3.03.08.08 0 0 0 .03-.05c.5-5.18-.84-9.68-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.22 0 2.18 1.1 2.16 2.42 0 1.34-.94 2.42-2.16 2.42z"/></svg>' },
+    gitlab: { name: "GitLab", cls: "glb", href: API + "/oauth/gitlab/start", icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="m23.6 9.6-.07-.18-3.1-7.9a.55.55 0 0 0-1.03 0l-2.03 5.19H6.63L4.6 1.52a.55.55 0 0 0-1.03 0L.46 9.42l-.07.18a3.86 3.86 0 0 0 1.3 4.32l.01.01 3.96 2.99 1.96 1.48 1.19.9a1.12 1.12 0 0 0 1.38 0l1.19-.9 1.96-1.48 3.97-3 .01-.01a3.86 3.86 0 0 0 1.3-4.32z"/></svg>' }
+  };
+
+  // 动态渲染已启用的第三方登录
+  fetch(API + "/oauth/providers")
+    .then(r => r.json())
+    .then(d => {
+      const box = $("oauthBtns");
+      const list = (d && d.providers) || ["github", "password"];
+      list.forEach(id => {
+        const cfg = BTNS[id];
+        if (!cfg) return;
+        const a = document.createElement("a");
+        a.className = "gh-btn" + (cfg.cls ? " " + cfg.cls : "");
+        a.href = cfg.href;
+        a.innerHTML = cfg.icon + "<span>使用 " + cfg.name + " 登录</span>";
+        box.appendChild(a);
+      });
+      // GitHub 兜底（providers 接口异常时也保证有按钮）
+      if (!list.includes("github")) {
+        const cfg = BTNS.github;
+        const a = document.createElement("a");
+        a.className = "gh-btn";
+        a.href = cfg.href;
+        a.innerHTML = cfg.icon + "<span>使用 GitHub 登录</span>";
+        box.appendChild(a);
+      }
+    })
+    .catch(() => {
+      const cfg = BTNS.github;
+      const a = document.createElement("a");
+      a.className = "gh-btn";
+      a.href = cfg.href;
+      a.innerHTML = cfg.icon + "<span>使用 GitHub 登录</span>";
+      $("oauthBtns").appendChild(a);
+    });
+
+  // 密码登录 / 注册
+  async function pwdReq(path, body) {
+    const r = await fetch(API + path, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (d.ok) {
+      showMsg("ok", d.msg);
+      setTimeout(() => location.reload(), 600);
+    } else {
+      showMsg("err", d.msg || "操作失败");
+    }
+    return d;
+  }
+  $("pwdLoginBtn").addEventListener("click", () => {
+    const u = $("pwdUser").value.trim(), pw = $("pwdPass").value;
+    if (!u || !pw) return showMsg("err", "请填写用户名和密码");
+    pwdReq("/auth/login", { username: u, password: pw });
+  });
+  $("pwdRegBtn").addEventListener("click", () => {
+    const u = $("pwdUser").value.trim(), pw = $("pwdPass").value;
+    if (!u || !pw) return showMsg("err", "请填写用户名和密码");
+    pwdReq("/auth/register", { username: u, password: pw });
+  });
+  $("pwdPass").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("pwdLoginBtn").click();
+  });
+
+  // 查询登录态
+  fetch(API + "/oauth/me", { credentials: "include" })
     .then(r => r.json())
     .then(d => {
       if (d && d.logged_in && d.user) {
         $("viewGuest").classList.add("hidden");
         $("viewUser").classList.remove("hidden");
         $("uAvatar").src = d.user.avatar || "";
-        $("uName").textContent = d.user.name || d.user.gh_login || d.user.email || "—";
-        $("uLogin").textContent = d.user.email ? d.user.email : ("@" + (d.user.gh_login || ""));
-        $("title").textContent = "欢迎，" + (d.user.name || d.user.gh_login);
-        $("sub").textContent = "当前以 GitHub 账号登录本站";
+        $("uName").textContent = d.user.name || d.user.username || d.user.gh_login || d.user.email || "—";
+        const loginId = d.user.email || (d.user.gh_login ? "@" + d.user.gh_login : "") || (d.user.username ? "@" + d.user.username : "");
+        $("uLogin").textContent = loginId;
+        $("title").textContent = "欢迎，" + ($("uName").textContent);
+        $("sub").textContent = "当前以 " + (d.user.provider || "账号") + " 登录本站";
       }
     })
     .catch(() => {});
 
   $("logoutBtn").addEventListener("click", () => {
-    location.href = API + "/logout";
+    location.href = API + "/oauth/logout";
   });
 })();
 </script>
