@@ -7,10 +7,54 @@
  *
  * 授权码：24 字节随机 hex，存 OP_CODES（key "code:"+code），10 分钟有效，一次性使用。
  */
-import { json, corsPreflight, randomHex, appGet, kvPut } from "./_lib.js";
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Content-Type": "application/json",
+};
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
+}
+
+function corsPreflight() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+function randomHex(len) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return [...arr].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function appGet(env, clientId) {
+  if (!env.OP_APPS) return null;
+  const raw = await env.OP_APPS.get("app:" + clientId);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+async function kvPut(env, key, obj, ttlSec) {
+  if (!env.OP_CODES) throw new Error("OP_CODES KV 未绑定");
+  await env.OP_CODES.put(key, JSON.stringify(obj), ttlSec ? { expirationTtl: ttlSec } : undefined);
+}
+
+async function verifyAdminToken(env, token) {
+  if (!env.TOKENS || !token) return false;
+  const t = String(token).trim();
+  if (!/^[A-Z0-9]{13}$/.test(t)) return false;
+  const raw = await env.TOKENS.get(t);
+  if (!raw) return false;
+  try {
+    const data = JSON.parse(raw);
+    if (data.expire && data.expire < Date.now()) return false;
+    return true;
+  } catch (e) { return false; }
+}
 
 const CODE_TTL = 10 * 60; // 10 分钟
-const CODE_RE = /^[a-f0-9]{48}$/;
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -84,15 +128,12 @@ async function handleConfirm(request, env) {
   }
 
   // 站长身份：管理站 Token
-  const { verifyAdminToken } = await import("./_lib.js");
   if (!(await verifyAdminToken(env, token))) {
     return json({ ok: false, msg: "管理站 Token 无效或已过期" }, 403);
   }
 
   // 生成一次性授权码
-  let code;
-  do { code = randomHex(24); } while (CODE_RE.test(code) === false || (await env.OP_CODES.get("code:" + code)));
-
+  const code = randomHex(24);
   await kvPut(env, "code:" + code, {
     client_id: clientId,
     redirect_uri: redirectUri,

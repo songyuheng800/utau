@@ -7,7 +7,26 @@
  * 底层复用主站 GitHub 存储（uploads/ 目录），与 /upload 同一套仓库逻辑。
  * 环境变量：GH_TOKEN / GH_USER / GH_REPO（已在主站配置）
  */
-import { json, corsPreflight, kvGet } from "./_lib.js";
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Content-Type": "application/json",
+};
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
+}
+
+function corsPreflight() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+async function kvGet(env, key) {
+  if (!env.OP_CODES) return null;
+  return await env.OP_CODES.get(key);
+}
 
 const MAX_RAW_SIZE = 50 * 1024 * 1024;
 const ALLOWED_EXT = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];

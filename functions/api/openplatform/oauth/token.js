@@ -9,9 +9,55 @@
  * access_token：32 字节 hex，1 小时；refresh_token：32 字节 hex，30 天。
  * 存 OP_CODES（key "token:" / "refresh:"）。
  */
-import { json, corsPreflight, randomHex, sha256Hex, appGet, kvPut, kvGet, kvDelete } from "./_lib.js";
 
-const ACCESS_TTL = 60 * 60;          // 1 小时
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Content-Type": "application/json",
+};
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
+}
+
+function corsPreflight() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+function randomHex(len) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return [...arr].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function appGet(env, clientId) {
+  if (!env.OP_APPS) return null;
+  const raw = await env.OP_APPS.get("app:" + clientId);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+async function kvGet(env, key) {
+  if (!env.OP_CODES) return null;
+  return await env.OP_CODES.get(key);
+}
+
+async function kvPut(env, key, obj, ttlSec) {
+  if (!env.OP_CODES) throw new Error("OP_CODES KV 未绑定");
+  await env.OP_CODES.put(key, JSON.stringify(obj), ttlSec ? { expirationTtl: ttlSec } : undefined);
+}
+
+async function kvDelete(env, key) {
+  if (env.OP_CODES) await env.OP_CODES.delete(key);
+}
+
+const ACCESS_TTL = 60 * 60;            // 1 小时
 const REFRESH_TTL = 30 * 24 * 60 * 60; // 30 天
 
 export async function onRequest(context) {
@@ -63,7 +109,7 @@ async function handleCodeGrant(body, app, env) {
   if (grant.used) return json({ ok: false, msg: "授权码已被使用（一次性）" }, 400);
   if (grant.client_id !== app.client_id) return json({ ok: false, msg: "授权码与应用不匹配" }, 400);
 
-  // 标记已使用
+  // 标记已使用并删除
   grant.used = true;
   await kvPut(env, "code:" + code, grant, 60);
   await kvDelete(env, "code:" + code);

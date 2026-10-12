@@ -3,8 +3,83 @@
  *   GET  /api/openplatform/apps            公开应用列表（不含密钥）
  *   POST /api/openplatform/apps            自助注册（name/desc/redirect_uri/scopes）
  *   返回 client_id + client_secret（secret 仅此一次明文返回）
+ *
+ * 注意：Cloudflare Pages Functions 不支持跨文件相对导入，公共工具已内联。
  */
-import { json, corsPreflight, randomHex, createAppCredential, appPut, appListPublic } from "./_lib.js";
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Content-Type": "application/json",
+};
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
+}
+
+function corsPreflight() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+function randomHex(len) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return [...arr].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function randomToken(len) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    let r;
+    do { r = crypto.getRandomValues(new Uint8Array(1))[0]; } while (r >= 252);
+    out += chars[r % chars.length];
+  }
+  return out;
+}
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function appPut(env, app) {
+  if (!env.OP_APPS) throw new Error("OP_APPS KV 未绑定");
+  await env.OP_APPS.put("app:" + app.client_id, JSON.stringify(app));
+}
+
+async function appListPublic(env) {
+  if (!env.OP_APPS) return [];
+  const out = [];
+  const list = await env.OP_APPS.list({ prefix: "app:" });
+  for (const k of list.keys) {
+    const raw = await env.OP_APPS.get(k.name);
+    if (!raw) continue;
+    try {
+      const app = JSON.parse(raw);
+      out.push({
+        client_id: app.client_id,
+        name: app.name,
+        desc: app.desc || "",
+        redirect_uri: app.redirect_uri || "",
+        scopes: app.scopes || [],
+        created: app.created || 0,
+        revoked: !!app.revoked,
+      });
+    } catch (e) { /* 跳过坏数据 */ }
+  }
+  return out;
+}
+
+async function createAppCredential() {
+  const clientId = randomHex(16);
+  const clientSecret = randomToken(32);
+  const secretHash = await sha256Hex(clientSecret);
+  return { client_id: clientId, client_secret: clientSecret, secret_hash: secretHash };
+}
 
 const VALID_SCOPES = ["read", "write"];
 const REDIRECT_URI_MAX = 500;

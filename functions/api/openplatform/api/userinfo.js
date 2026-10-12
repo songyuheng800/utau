@@ -3,7 +3,26 @@
  *   GET /api/openplatform/api/userinfo   Authorization: Bearer <access_token>
  *   返回当前授权用户（站长）公开信息
  */
-import { json, corsPreflight, kvGet } from "./_lib.js";
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Content-Type": "application/json",
+};
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
+}
+
+function corsPreflight() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+async function kvGet(env, key) {
+  if (!env.OP_CODES) return null;
+  return await env.OP_CODES.get(key);
+}
 
 export async function onRequest(context) {
   const { request, env } = context;
