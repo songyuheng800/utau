@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UTAU 配布站 · 开放平台授权登录测试</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231d1d1f'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23f5c542' font-family='Arial' font-weight='900'%3EU%3C/text%3E%3C/svg%3E">
+<style>
+  :root{--bg:#121214;--card:#1d1d1f;--card2:#242426;--line:#333336;--txt:#e8e8ea;--dim:#8b8b90;--red:#e02424;--gold:#f5c542;--gh:#f0f6fc;}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  .top{height:60px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--line);background:var(--card)}
+  .top .logo{font-weight:900;font-size:20px;color:var(--gold);letter-spacing:.5px}
+  .top .logo span{color:var(--dim);font-weight:400;font-size:13px;margin-left:10px}
+  .top a.back{margin-left:auto;color:var(--dim);text-decoration:none;font-size:13px}
+  .top a.back:hover{color:var(--txt)}
+  main{flex:1;display:flex;align-items:center;justify-content:center;padding:30px 16px}
+  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 28px;text-align:center}
+  .badge{display:inline-block;font-size:12px;color:var(--gold);border:1px solid var(--gold);border-radius:20px;padding:3px 12px;margin-bottom:16px;opacity:.9}
+  h1{font-size:22px;margin-bottom:6px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:22px;line-height:1.6}
+  .op-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--card2);color:var(--gold);border:1px solid var(--gold);border-radius:10px;padding:12px 0;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;text-decoration:none;margin-bottom:10px}
+  .op-btn:hover{background:#2a2a2d;border-color:#f7d567}
+  .op-btn .u-ico{width:19px;height:19px;border-radius:5px;background:var(--gold);color:#1a1a1a;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .tip{margin-top:16px;font-size:12px;color:var(--dim);line-height:1.7}
+  .tip b{color:var(--txt);font-weight:600}
+  .avatar{width:76px;height:76px;border-radius:50%;border:2px solid var(--gold);margin:6px auto 14px;display:flex;align-items:center;justify-content:center;background:var(--card2);font-size:30px;font-weight:900;color:var(--gold)}
+  .uname{font-size:20px;font-weight:700;word-break:break-all}
+  .ulogin{color:var(--dim);font-size:13px;margin:4px 0 6px;word-break:break-all}
+  .ustat{display:inline-block;font-size:12px;color:#3fb950;border:1px solid #3fb950;border-radius:20px;padding:2px 10px;margin-top:4px}
+  .token-box{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--dim);text-align:left;margin-top:14px;word-break:break-all;line-height:1.7;cursor:pointer}
+  .token-box b{color:var(--txt)}
+  .token-box .cp{color:var(--gold);font-size:10px;float:right}
+  .logout-btn{margin-top:24px;background:transparent;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:10px 0;width:100%;cursor:pointer;font-size:14px;transition:.15s}
+  .logout-btn:hover{color:var(--red);border-color:var(--red)}
+  .msg{margin-bottom:16px;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;display:none;text-align:left}
+  .msg.ok{display:block;background:rgba(63,185,80,.08);border:1px solid #3fb950;color:#3fb950}
+  .msg.err{display:block;background:rgba(224,36,36,.08);border:1px solid var(--red);color:#ff7b72}
+  .msg.info{display:block;background:rgba(139,139,144,.08);border:1px solid var(--dim);color:var(--dim)}
+  footer{border-top:1px solid var(--line);padding:16px 20px;text-align:center;font-size:12px;color:var(--dim);background:var(--card);line-height:1.8}
+  footer b{color:var(--red);font-weight:600}
+  footer .sep{color:var(--line);margin:0 6px}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">UTAU<span>开放平台授权登录 · 测试</span></div>
+    <a class="back" href="https://songyuheng800.github.io/utau/">← 返回配布站</a>
+  </div>
+
+  <main>
+    <div class="card">
+      <div class="badge">OAuth 授权登录</div>
+      <h1 id="title">登录 UTAU 配布站</h1>
+      <p class="sub" id="sub">使用 UTAU 开放平台授权登录（OAuth 2.0 授权码流程）<br>仅此一种登录方式，专用于流程测试</p>
+
+      <div id="msgBox"></div>
+
+      <div id="viewGuest">
+        <a class="op-btn" id="opLoginBtn">
+          <span class="u-ico">U</span>
+          <span>使用 UTAU 开放平台授权登录</span>
+        </a>
+        <div class="tip">
+          <b>流程：</b>点击后跳转开放平台授权页 →<br>输入管理站 Token 确认授权 → 自动回到本站并显示登录结果。
+        </div>
+      </div>
+
+      <div id="viewUser" class="hidden">
+        <div class="avatar" id="uAvatar">U</div>
+        <div class="uname" id="uName">—</div>
+        <div class="ulogin" id="uLogin"></div>
+        <div><span class="ustat">已通过开放平台登录</span></div>
+        <div class="token-box" id="tokenBox" title="点击复制 access_token">点击复制令牌…</div>
+        <button class="logout-btn" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <b>★ 配布禁止 · 转载注明出处 ★</b><br>
+    微信：18946843204<span class="sep">|</span>QQ：2192465687
+  </footer>
+
+<script>
+(function(){
+  // ===== 测试站应用的 OAuth 凭证（开放平台注册时分配） =====
+  const API = "https://utau-4oo.pages.dev";
+  const AUTH_PAGE = "https://songyuheng800.github.io/utau/openplatform/authorize.html";
+  const CLIENT_ID = "fb4b3499f766c855251097a766b10938";
+  const CLIENT_SECRET = "YAR1QD3BY4G7RZXC5LII7GV0IJRU57FA";
+  const REDIRECT_URI = "https://songyuheng800.github.io/utau/login/test/";
+  const SCOPE = "read";
+
+  const $ = (id) => document.getElementById(id);
+  const msgBox = $("msgBox");
+  const showMsg = (type, text) => {
+    msgBox.className = "msg " + type;
+    msgBox.textContent = text;
+  };
+
+  let tokens = null;
+
+  // 游客态 → 登录态
+  function renderUser(user) {
+    $("viewGuest").classList.add("hidden");
+    $("viewUser").classList.remove("hidden");
+    $("uName").textContent = (user && user.name) ? user.name : "UTAU 配布站管理员";
+    $("uLogin").textContent = (user && user.id ? "@" + user.id : "") + " · 经开放平台 OAuth 授权";
+    $("title").textContent = "欢迎，" + $("uName").textContent;
+    $("sub").textContent = "当前通过 UTAU 开放平台授权登录";
+    if (tokens) {
+      $("tokenBox").innerHTML = "<span class='cp'>点击复制</span><b>access_token</b>：" + tokens.access_token + "<br><b>refresh_token</b>：" + tokens.refresh_token + "<br><b>scope</b>：" + (tokens.scope || SCOPE);
+      $("tokenBox").onclick = () => {
+        navigator.clipboard && navigator.clipboard.writeText(tokens.access_token).then(() => showMsg("ok", "已复制 access_token"));
+      };
+    }
+  }
+
+  // 1) 发起登录：生成随机 state → 跳转开放平台授权页
+  $("opLoginBtn").addEventListener("click", () => {
+    const state = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, "0")).join("");
+    localStorage.setItem("utau_test_oauth_state", state);
+    const url = AUTH_PAGE + "?client_id=" + encodeURIComponent(CLIENT_ID) +
+      "&redirect_uri=" + encodeURIComponent(REDIRECT_URI) +
+      "&scope=" + encodeURIComponent(SCOPE) +
+      "&state=" + encodeURIComponent(state);
+    location.href = url;
+  });
+
+  // 2) 回跳处理：?code=xxx&state=yyy
+  async function handleCallback() {
+    const p = new URLSearchParams(location.search);
+    const code = p.get("code");
+    const state = p.get("state");
+    const err = p.get("error");
+    if (err) return showMsg("err", "授权失败：" + err);
+    if (!code) return;
+    if (!state || state !== localStorage.getItem("utau_test_oauth_state")) {
+      return showMsg("err", "state 校验失败（防 CSRF 保护），请重新登录");
+    }
+    localStorage.removeItem("utau_test_oauth_state");
+    history.replaceState(null, "", location.pathname);
+
+    showMsg("info", "授权成功，正在换取令牌…");
+    try {
+      // 3) 授权码换令牌
+      const t = await fetch(API + "/api/openplatform/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grant_type: "authorization_code",
+          client_id: CLIENT_ID,
+          client_secret: CLIENT_SECRET,
+          code,
+          redirect_uri: REDIRECT_URI,
+        }),
+      });
+      const td = await t.json();
+      if (!td.ok) return showMsg("err", "换取令牌失败：" + (td.msg || "未知错误"));
+      tokens = { access_token: td.access_token, refresh_token: td.refresh_token, scope: td.scope };
+
+      // 4) 用 access_token 调 userinfo 展示用户
+      const u = await fetch(API + "/api/openplatform/api/userinfo", {
+        headers: { Authorization: "Bearer " + td.access_token },
+      });
+      const ud = await u.json();
+      if (!ud.ok) return showMsg("err", "获取用户信息失败：" + (ud.msg || "未知错误"));
+
+      showMsg("ok", "登录成功！");
+      renderUser(ud.user);
+    } catch (e) {
+      showMsg("err", "网络错误：" + e.message);
+    }
+  }
+
+  // 退出登录
+  $("logoutBtn").addEventListener("click", () => {
+    tokens = null;
+    $("viewUser").classList.add("hidden");
+    $("viewGuest").classList.remove("hidden");
+    $("title").textContent = "登录 UTAU 配布站";
+    $("sub").textContent = "使用 UTAU 开放平台授权登录（OAuth 2.0 授权码流程）<br>仅此一种登录方式，专用于流程测试";
+    $("tokenBox").innerHTML = "点击复制令牌…";
+    showMsg("info", "你已退出登录。");
+    history.replaceState(null, "", location.pathname);
+  });
+
+  handleCallback();
+})();
+</script>
+</body>
+</html>
