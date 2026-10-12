@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>授权 - UTAU 开放平台</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap" style="max-width:640px">
+  <div class="card">
+    <h2 style="text-align:center">授权第三方应用</h2>
+    <div id="loading"><p class="muted" style="text-align:center">正在验证应用…</p></div>
+
+    <div id="errorCard" style="display:none;text-align:center">
+      <p id="errText" style="color:var(--danger);margin:20px 0"></p>
+      <a class="btn ghost" href="index.html">← 返回开放平台</a>
+    </div>
+
+    <div id="authCard" style="display:none">
+      <div style="text-align:center;margin-bottom:16px">
+        <h3 id="appName" style="font-size:22px"></h3>
+        <p class="muted small" id="appDesc"></p>
+        <p class="muted small" style="margin-top:6px">请求访问以下权限：</p>
+        <div id="scopeList" style="margin:8px 0"></div>
+        <p class="muted small">授权后将跳转回：<code id="appRedirect"></code></p>
+      </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <p class="muted small">本站为个人站，授权即代表以<b>站长</b>身份授予该应用上述权限。请输入<b>管理站 Token</b> 完成身份确认：</p>
+      <label>管理站 Token</label>
+      <input id="token" placeholder="13 位 Token（去管理后台生成）">
+      <div id="msg" class="msg"></div>
+      <button class="btn" id="approve" style="width:100%;margin-top:14px">确认授权</button>
+      <p class="muted small" style="text-align:center;margin-top:10px"><a href="../admin/token/" target="_blank">还没有 Token？去生成一个</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="footer">UTAU 配布站 · 开放平台 · OAuth 2.0 授权</div>
+
+<script>
+const API = "https://utau-4oo.pages.dev";
+const params = new URLSearchParams(location.search);
+const clientId = params.get("client_id") || "";
+const redirectUri = params.get("redirect_uri") || "";
+const scope = params.get("scope") || "read";
+const state = params.get("state") || "";
+
+async function init() {
+  if (!clientId || !redirectUri) return showError("缺少 client_id 或 redirect_uri 参数");
+  try {
+    const r = await fetch(API + "/api/openplatform/oauth/authorize?client_id=" + encodeURIComponent(clientId) +
+      "&redirect_uri=" + encodeURIComponent(redirectUri) + "&scope=" + encodeURIComponent(scope));
+    const d = await r.json();
+    if (!d.ok) return showError(d.msg || "应用校验失败");
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("authCard").style.display = "block";
+    document.getElementById("appName").textContent = d.app.name;
+    document.getElementById("appDesc").textContent = d.app.desc || "";
+    document.getElementById("appRedirect").textContent = d.app.redirect_uri;
+    document.getElementById("scopeList").innerHTML = (d.scopes||[]).map(s => '<span class="tag ' + s + '">' + s + '</span>').join(' ');
+  } catch (e) {
+    showError("网络错误：" + e.message);
+  }
+}
+
+document.getElementById("approve").onclick = async () => {
+  const token = document.getElementById("token").value.trim();
+  const msg = document.getElementById("msg");
+  if (!token) return show(msg, "请输入管理站 Token", "err");
+  show(msg, "", "");
+  const btn = document.getElementById("approve");
+  btn.disabled = true; btn.textContent = "授权中…";
+  try {
+    const r = await fetch(API + "/api/openplatform/oauth/authorize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: clientId, redirect_uri: redirectUri, scope, state, token }),
+    });
+    const d = await r.json();
+    if (!d.ok) return show(msg, d.msg || "授权失败", "err");
+    show(msg, "授权成功，正在跳转…", "ok");
+    setTimeout(() => { location.href = d.redirect_url; }, 800);
+  } catch (e) {
+    show(msg, "网络错误：" + e.message, "err");
+  } finally {
+    btn.disabled = false; btn.textContent = "确认授权";
+  }
+};
+
+function showError(text) {
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("errorCard").style.display = "block";
+  document.getElementById("errText").textContent = text;
+}
+function show(el, text, type) {
+  el.className = "msg " + type;
+  el.textContent = text;
+  if (!text) el.style.display = "none"; else el.style.display = "block";
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>开放平台管理 - UTAU 管理后台</title>
+<link rel="stylesheet" href="../openplatform/assets/style.css">
+<style>
+body{background:#0e1117}
+.wrap{max-width:860px}
+input[type=password]{font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="index.html">UTAU<b>管理后台</b></a>
+  <nav>
+    <a href="index.html">文件管理</a>
+    <a href="token/index.html">Token 获取</a>
+    <a href="openplatform.html">开放平台管理</a>
+    <a href="../openplatform/">开放平台前台</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>开放平台应用管理</h2>
+    <p class="muted small">输入<b>管理站 Token</b> 查看全部已注册应用，可吊销 / 恢复任意应用。</p>
+    <div id="msg" class="msg"></div>
+    <label>管理站 Token</label>
+    <div class="row">
+      <input id="token" type="password" placeholder="13 位 Token（Token 获取页生成）" style="flex:1">
+      <button class="btn" id="load" style="flex:0 0 auto">加载</button>
+    </div>
+  </div>
+
+  <div class="card" id="listCard" style="display:none">
+    <h2>已注册应用 <span class="muted small" id="count"></span></h2>
+    <div id="applist"><p class="muted small">加载中…</p></div>
+  </div>
+</div>
+
+<div class="footer">UTAU 配布站 · 管理后台 · 开放平台</div>
+
+<script>
+const API = "https://utau-4oo.pages.dev";
+let token = "";
+
+document.getElementById("load").onclick = async () => {
+  token = document.getElementById("token").value.trim();
+  const msg = document.getElementById("msg");
+  if (!token) return show(msg, "请输入管理站 Token", "err");
+  show(msg, "", "");
+  try {
+    const r = await fetch(API + "/api/openplatform/admin/apps?token=" + encodeURIComponent(token));
+    const d = await r.json();
+    if (!d.ok) return show(msg, d.msg || "Token 无效", "err");
+    renderList(d.apps);
+    document.getElementById("listCard").style.display = "block";
+    show(msg, "加载成功，共 " + d.apps.length + " 个应用", "ok");
+  } catch (e) {
+    show(msg, "网络错误：" + e.message, "err");
+  }
+};
+
+function renderList(apps) {
+  document.getElementById("count").textContent = "（" + apps.length + "）";
+  const box = document.getElementById("applist");
+  if (!apps.length) { box.innerHTML = '<p class="muted small">还没有应用注册。</p>'; return; }
+  let html = '<table><tr><th>应用</th><th>回调地址</th><th>权限</th><th>状态</th><th>操作</th></tr>';
+  for (const a of apps) {
+    const tags = (a.scopes||[]).map(s => '<span class="tag ' + s + '">' + s + '</span>').join(' ');
+    const st = a.revoked ? '<span class="tag off">已吊销</span>' : '<span class="tag on">正常</span>';
+    const btn = a.revoked
+      ? '<button class="btn ghost" onclick="toggle(\'' + a.client_id + '\',\'restore\',this)">恢复</button>'
+      : '<button class="btn danger" onclick="toggle(\'' + a.client_id + '\',\'revoke\',this)">吊销</button>';
+    html += '<tr><td><b>' + esc(a.name) + '</b><div class="muted small">' + esc(a.client_id) + '</div></td>' +
+      '<td class="small"><code>' + esc(a.redirect_uri) + '</code></td><td>' + tags + '</td><td>' + st + '</td><td>' + btn + '</td></tr>';
+  }
+  box.innerHTML = html + '</table>';
+}
+
+async function toggle(clientId, action, btn) {
+  if (action === "revoke" && !confirm("吊销该应用？将无法再发起授权。")) return;
+  btn.disabled = true;
+  const msg = document.getElementById("msg");
+  try {
+    const r = await fetch(API + "/api/openplatform/admin/apps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, action, client_id: clientId }),
+    });
+    const d = await r.json();
+    if (!d.ok) return show(msg, d.msg || "操作失败", "err");
+    show(msg, d.msg, "ok");
+    // 刷新列表
+    const r2 = await fetch(API + "/api/openplatform/admin/apps?token=" + encodeURIComponent(token));
+    const d2 = await r2.json();
+    if (d2.ok) renderList(d2.apps);
+  } catch (e) {
+    show(msg, "网络错误：" + e.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function esc(s){ return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function show(el, text, type) {
+  el.className = "msg " + type;
+  el.textContent = text;
+  if (!text) el.style.display = "none"; else el.style.display = "block";
+}
+document.getElementById("token").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("load").click(); });
+</script>
+</body>
+</html>

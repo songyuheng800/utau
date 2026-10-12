@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>开放平台 - UTAU 配布站</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="index.html">UTAU<b>开放平台</b></a>
+  <nav>
+    <a href="index.html">首页</a>
+    <a href="register.html">注册应用</a>
+    <a href="apps.html">我的应用</a>
+    <a href="docs.html">API 文档</a>
+  </nav>
+</div>
+
+<div class="hero">
+  <h1>让第三方应用接入 <b>UTAU 配布站</b></h1>
+  <p>标准 OAuth 2.0 授权流程。注册一个应用，获取 client_id / client_secret，即可代表用户读写本站的工程与声库资源。</p>
+  <a class="btn" href="register.html">立即注册应用</a>
+  <a class="btn ghost" href="docs.html" style="margin-left:10px">阅读文档</a>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>为什么接入</h2>
+    <div class="row">
+      <div>
+        <h3>🔐 标准 OAuth 2.0</h3>
+        <p class="muted small">授权码流程 + 短期访问令牌 + 刷新令牌，安全可控，随时可吊销。</p>
+      </div>
+      <div>
+        <h3>📦 完整资源 API</h3>
+        <p class="muted small">读取文件列表、上传工程/声库、删除文件，权限粒度到 read / write。</p>
+      </div>
+      <div>
+        <h3>⚡ 自助接入</h3>
+        <p class="muted small">填一张表单立即获得应用凭证，无需等待审核，后台可随时吊销。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>已接入应用</h2>
+    <div id="applist"><p class="muted small">加载中…</p></div>
+  </div>
+
+  <div class="card">
+    <h2>快速开始</h2>
+    <ol class="small">
+      <li><a href="register.html">注册应用</a>，填写应用名、描述、回调地址，选择权限。</li>
+      <li>保存返回的 <code>client_id</code> 与 <code>client_secret</code>（secret 仅显示一次）。</li>
+      <li>引导用户访问授权页 <code>authorize.html</code>，用户确认后获得授权码。</li>
+      <li>用授权码换 <code>access_token</code>，携带 Bearer 调用资源 API。</li>
+    </ol>
+  </div>
+</div>
+
+<div class="footer">UTAU 配布站 · 开放平台 · 有问题去管理后台或找站长</div>
+
+<script>
+const API = "https://utau-4oo.pages.dev";
+async function loadApps() {
+  const box = document.getElementById("applist");
+  try {
+    const r = await fetch(API + "/api/openplatform/apps");
+    const d = await r.json();
+    if (!d.ok) { box.innerHTML = '<p class="muted small">加载失败：' + (d.msg||"") + '</p>'; return; }
+    if (!d.apps.length) { box.innerHTML = '<p class="muted small">还没有应用接入，成为第一个吧。</p>'; return; }
+    let html = '<table><tr><th>应用</th><th>描述</th><th>权限</th><th>状态</th></tr>';
+    for (const a of d.apps) {
+      const tags = (a.scopes||[]).map(s => '<span class="tag ' + s + '">' + s + '</span>').join(' ');
+      const st = a.revoked ? '<span class="tag off">已吊销</span>' : '<span class="tag on">正常</span>';
+      html += '<tr><td><b>' + esc(a.name) + '</b><div class="muted small">' + esc(a.client_id) + '</div></td><td class="small">' + esc(a.desc||"-") + '</td><td>' + tags + '</td><td>' + st + '</td></tr>';
+    }
+    box.innerHTML = html + '</table>';
+  } catch (e) {
+    box.innerHTML = '<p class="muted small">加载失败：网络错误（' + e.message + '）</p>';
+  }
+}
+function esc(s){ return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+loadApps();
+</script>
+</body>
+</html>

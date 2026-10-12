@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的应用 - UTAU 开放平台</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="index.html">UTAU<b>开放平台</b></a>
+  <nav>
+    <a href="index.html">首页</a>
+    <a href="register.html">注册应用</a>
+    <a href="apps.html">我的应用</a>
+    <a href="docs.html">API 文档</a>
+  </nav>
+</div>
+
+<div class="wrap" style="max-width:720px">
+  <div class="card">
+    <h2>应用查询 / 管理</h2>
+    <p class="muted small">输入你的 <code>client_id</code> 与 <code>client_secret</code> 验证身份，查看应用详情或吊销。</p>
+    <div id="msg" class="msg"></div>
+    <label>Client ID</label>
+    <input id="cid" placeholder="32 位十六进制">
+    <label>Client Secret</label>
+    <input id="secret" type="password" placeholder="注册时返回的密钥">
+    <button class="btn" id="lookup" style="margin-top:16px;width:100%">查询应用</button>
+  </div>
+
+  <div class="card" id="detailCard" style="display:none">
+    <h2 id="dName"></h2>
+    <div class="small">
+      <div><b>Client ID：</b><code id="dCid"></code></div>
+      <div><b>描述：</b><span id="dDesc"></span></div>
+      <div><b>回调地址：</b><code id="dRedirect"></code></div>
+      <div><b>权限：</b><span id="dScopes"></span></div>
+      <div><b>创建时间：</b><span id="dCreated"></span></div>
+      <div><b>状态：</b><span id="dStatus"></span></div>
+    </div>
+    <button class="btn danger" id="revoke" style="margin-top:16px;width:100%">吊销此应用</button>
+  </div>
+</div>
+
+<div class="footer">UTAU 配布站 · 开放平台</div>
+
+<script>
+const API = "https://utau-4oo.pages.dev";
+let current = null;
+
+document.getElementById("lookup").onclick = async () => {
+  const cid = document.getElementById("cid").value.trim();
+  const secret = document.getElementById("secret").value.trim();
+  const msg = document.getElementById("msg");
+  if (!cid || !secret) return show(msg, "请填写 client_id 和 client_secret", "err");
+  show(msg, "", "");
+  try {
+    const r = await fetch(API + "/api/openplatform/apps/manage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "info", client_id: cid, client_secret: secret }),
+    });
+    const d = await r.json();
+    if (!d.ok) return show(msg, d.msg || "查询失败", "err");
+    current = d.app;
+    render(d.app);
+    show(msg, "凭据有效，已加载应用信息", "ok");
+  } catch (e) {
+    show(msg, "网络错误：" + e.message, "err");
+  }
+};
+
+document.getElementById("revoke").onclick = async () => {
+  if (!current) return;
+  if (!confirm("确定吊销 " + current.name + " 吗？吊销后该 client_id 将无法再发起授权。")) return;
+  const msg = document.getElementById("msg");
+  try {
+    const r = await fetch(API + "/api/openplatform/apps/manage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "revoke", client_id: current.client_id, client_secret: document.getElementById("secret").value.trim() }),
+    });
+    const d = await r.json();
+    if (!d.ok) return show(msg, d.msg || "吊销失败", "err");
+    current.revoked = true;
+    render(current);
+    show(msg, "已吊销该应用", "ok");
+  } catch (e) {
+    show(msg, "网络错误：" + e.message, "err");
+  }
+};
+
+function render(a) {
+  document.getElementById("detailCard").style.display = "block";
+  document.getElementById("dName").textContent = a.name;
+  document.getElementById("dCid").textContent = a.client_id;
+  document.getElementById("dDesc").textContent = a.desc || "-";
+  document.getElementById("dRedirect").textContent = a.redirect_uri;
+  document.getElementById("dScopes").innerHTML = (a.scopes||[]).map(s => '<span class="tag ' + s + '">' + s + '</span>').join(' ');
+  document.getElementById("dCreated").textContent = new Date(a.created).toLocaleString();
+  document.getElementById("dStatus").innerHTML = a.revoked ? '<span class="tag off">已吊销</span>' : '<span class="tag on">正常</span>';
+  document.getElementById("revoke").disabled = !!a.revoked;
+  document.getElementById("revoke").textContent = a.revoked ? "已吊销" : "吊销此应用";
+}
+
+function show(el, text, type) {
+  el.className = "msg " + type;
+  el.textContent = text;
+  if (!text) el.style.display = "none"; else el.style.display = "block";
+}
+</script>
+</body>
+</html>

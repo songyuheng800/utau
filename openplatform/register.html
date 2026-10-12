@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>注册应用 - UTAU 开放平台</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="index.html">UTAU<b>开放平台</b></a>
+  <nav>
+    <a href="index.html">首页</a>
+    <a href="register.html">注册应用</a>
+    <a href="apps.html">我的应用</a>
+    <a href="docs.html">API 文档</a>
+  </nav>
+</div>
+
+<div class="wrap" style="max-width:720px">
+  <div class="card">
+    <h2>注册一个新应用</h2>
+    <p class="muted small">填完表单立即获得 <code>client_id</code> 与 <code>client_secret</code>。注意：<b>client_secret 只显示一次</b>，请立即保存，丢失只能重新注册。</p>
+
+    <div id="msg" class="msg"></div>
+
+    <label>应用名称 *</label>
+    <input id="name" maxlength="40" placeholder="例如：UTAU 工具箱">
+
+    <label>应用描述</label>
+    <textarea id="desc" maxlength="200" rows="3" placeholder="这个应用做什么？"></textarea>
+
+    <label>回调地址（redirect_uri）*</label>
+    <input id="redirect" placeholder="https://你的应用.com/oauth/callback">
+    <p class="muted small" style="margin-top:4px">必须是 https:// 开头的完整 URL。授权完成后会带着 code 跳回这里。</p>
+
+    <label>权限范围</label>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;margin:0">
+        <input type="checkbox" id="sc-read" style="width:auto" checked> <span>read — 读取用户信息与文件列表</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;margin:0">
+        <input type="checkbox" id="sc-write" style="width:auto"> <span class="muted">write — 上传 / 删除文件</span>
+      </label>
+    </div>
+
+    <button class="btn" id="submit" style="margin-top:20px;width:100%">注册</button>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h2>注册成功 —— 保存凭证！</h2>
+    <label>Client ID</label>
+    <div class="codeblock" id="rCid"></div>
+    <label>Client Secret <span class="tag off">仅此一次</span></label>
+    <div class="codeblock" id="rSecret"></div>
+    <p class="muted small" style="margin-top:8px">回到 <a href="apps.html">我的应用</a> 可凭 client_secret 查看详情或吊销应用。</p>
+  </div>
+</div>
+
+<div class="footer">UTAU 配布站 · 开放平台</div>
+
+<script>
+const API = "https://utau-4oo.pages.dev";
+
+async function copyText(t, btn) {
+  try { await navigator.clipboard.writeText(t); } catch(e) {}
+  if (btn) { const old = btn.textContent; btn.textContent = "已复制"; setTimeout(()=>btn.textContent=old, 1500); }
+}
+
+document.getElementById("submit").onclick = async () => {
+  const name = document.getElementById("name").value.trim();
+  const desc = document.getElementById("desc").value.trim();
+  const redirect = document.getElementById("redirect").value.trim();
+  const scopes = [];
+  if (document.getElementById("sc-read").checked) scopes.push("read");
+  if (document.getElementById("sc-write").checked) scopes.push("write");
+
+  const msg = document.getElementById("msg");
+  if (!name) return show(msg, "应用名称必填", "err");
+  if (!/^https:\/\/.+/.test(redirect)) return show(msg, "回调地址必须是 https:// 开头的完整 URL", "err");
+  if (!scopes.length) return show(msg, "至少选择一个权限", "err");
+
+  const btn = document.getElementById("submit");
+  btn.disabled = true; btn.textContent = "注册中…";
+  show(msg, "", "");
+  try {
+    const r = await fetch(API + "/api/openplatform/apps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, desc, redirect_uri: redirect, scopes }),
+    });
+    const d = await r.json();
+    if (!d.ok) return show(msg, d.msg || "注册失败", "err");
+    document.getElementById("rCid").textContent = d.client_id;
+    const sec = document.getElementById("rSecret");
+    sec.textContent = d.client_secret;
+    window.__secret = d.client_secret;
+    sec.insertAdjacentHTML("beforeend", '<button class="copybtn" onclick="copyText(window.__secret,this)">复制</button>');
+    document.getElementById("resultCard").style.display = "block";
+    show(msg, "注册成功！client_secret 仅显示这一次，请立即保存。", "ok");
+    document.getElementById("name").value = "";
+    document.getElementById("desc").value = "";
+    document.getElementById("redirect").value = "";
+  } catch (e) {
+    show(msg, "网络错误：" + e.message, "err");
+  } finally {
+    btn.disabled = false; btn.textContent = "注册";
+  }
+};
+
+function show(el, text, type) {
+  el.className = "msg " + type;
+  el.textContent = text;
+  if (!text) el.style.display = "none"; else el.style.display = "block";
+}
+</script>
+</body>
+</html>

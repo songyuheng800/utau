@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API 文档 - UTAU 开放平台</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.docs h2 { margin-top: 36px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.docs h3 { margin-top: 24px; }
+.endpoint { display: inline-block; font-family: var(--mono); font-size: 13px; padding: 2px 8px; border-radius: 6px; }
+.endpoint.get { background: rgba(63,182,255,.12); color: #58a6ff; }
+.endpoint.post { background: rgba(126,231,135,.12); color: #7ee787; }
+.endpoint.delete { background: rgba(248,81,73,.12); color: #f85149; }
+.toc { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 24px; }
+.toc a { display: inline-block; margin-right: 16px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="index.html">UTAU<b>开放平台</b></a>
+  <nav>
+    <a href="index.html">首页</a>
+    <a href="register.html">注册应用</a>
+    <a href="apps.html">我的应用</a>
+    <a href="docs.html">API 文档</a>
+  </nav>
+</div>
+
+<div class="wrap docs">
+  <h1>API 文档</h1>
+  <p class="muted">标准 OAuth 2.0 授权码流程 + 资源 API。所有请求基于 HTTPS。</p>
+
+  <div class="toc">
+    <a href="#base">接口地址</a>
+    <a href="#flow">授权流程</a>
+    <a href="#authorize">授权端点</a>
+    <a href="#token">Token 端点</a>
+    <a href="#userinfo">用户信息</a>
+    <a href="#files">文件 API</a>
+    <a href="#refresh">刷新令牌</a>
+    <a href="#errors">错误说明</a>
+  </div>
+
+  <h2 id="base">接口地址</h2>
+  <p>API 基地址（Cloudflare Pages Functions）：</p>
+  <div class="codeblock">https://utau-4oo.pages.dev/api/openplatform</div>
+  <p class="muted small">授权页（前端页面）：https://songyuheng800.github.io/utau/openplatform/authorize.html</p>
+
+  <h2 id="flow">授权流程（Authorization Code）</h2>
+  <div class="codeblock">1. 应用跳转授权页
+   https://songyuheng800.github.io/utau/openplatform/authorize.html
+      ?client_id=&lt;你的client_id&gt;
+      &amp;redirect_uri=&lt;注册时的回调地址&gt;
+      &amp;scope=read%20write
+      &amp;state=&lt;任意随机串，防CSRF&gt;
+
+2. 站长在授权页输入管理站 Token 并确认
+   → 浏览器 302 跳回你的回调地址：
+   &lt;redirect_uri&gt;?code=&lt;一次性授权码&gt;&amp;state=&lt;原样返回&gt;
+
+3. 应用用授权码换令牌（POST /oauth/token）：
+   → access_token（1 小时）+ refresh_token（30 天）
+
+4. 携带 Bearer access_token 调用资源 API</div>
+
+  <h2 id="authorize">授权端点</h2>
+  <h3>预检（授权页自动调用，无需手动）</h3>
+  <p><span class="endpoint get">GET</span> <code>/oauth/authorize?client_id&redirect_uri&scope</code></p>
+  <p class="muted small">校验应用是否有效、回调地址是否匹配、权限是否已注册。</p>
+
+  <h3>确认授权</h3>
+  <p><span class="endpoint post">POST</span> <code>/oauth/authorize</code></p>
+  <div class="codeblock">{
+  "client_id": "…",
+  "redirect_uri": "https://你的应用.com/oauth/callback",
+  "scope": "read write",
+  "state": "abc123",
+  "token": "管理站Token"
+}
+→ 200 { "ok": true, "redirect_url": "…?code=xxx&state=abc123" }</div>
+
+  <h2 id="token">Token 端点</h2>
+  <p><span class="endpoint post">POST</span> <code>/oauth/token</code> —— 授权码换令牌</p>
+  <div class="codeblock">{
+  "grant_type": "authorization_code",
+  "client_id": "…",
+  "client_secret": "…",
+  "code": "上一步拿到的code",
+  "redirect_uri": "https://你的应用.com/oauth/callback"
+}
+→ 200 {
+  "access_token": "…", "token_type": "Bearer",
+  "expires_in": 3600, "refresh_token": "…", "scope": "read write"
+}</div>
+
+  <h2 id="userinfo">用户信息</h2>
+  <p><span class="endpoint get">GET</span> <code>/api/userinfo</code></p>
+  <div class="codeblock">Authorization: Bearer &lt;access_token&gt;
+→ 200 { "ok": true, "user": { "id": "admin", "name": "UTAU 配布站管理员" }, "scope": "read write" }</div>
+
+  <h2 id="files">文件 API</h2>
+  <h3>文件列表（公开只读）</h3>
+  <p><span class="endpoint get">GET</span> <code>/api/files</code></p>
+  <div class="codeblock">→ 200 { "ok": true, "count": 12, "files": [ { "name": "…", "size": 12345, "raw": "https://…" } ] }</div>
+
+  <h3>上传文件（需 write）</h3>
+  <p><span class="endpoint post">POST</span> <code>/api/files</code></p>
+  <div class="codeblock">Authorization: Bearer &lt;access_token&gt;
+{
+  "filename": "工程名.ustx",
+  "data": "&lt;base64 编码的文件内容&gt;"
+}
+→ 200 { "ok": true, "filename": "2026-…_工程名.ustx" }</div>
+  <p class="muted small">支持扩展名：ust / ustx / vsq / vsqx / vpr / pp2 / pp3 / zip / rar，单文件上限 50MB（base64）。文件名会自动加时间戳前缀，同名不会覆盖。</p>
+
+  <h3>删除文件（需 write）</h3>
+  <p><span class="endpoint delete">DELETE</span> <code>/api/files</code></p>
+  <div class="codeblock">Authorization: Bearer &lt;access_token&gt;
+{ "filename": "2026-…_工程名.ustx" }
+→ 200 { "ok": true }</div>
+
+  <h2 id="refresh">刷新令牌</h2>
+  <p><span class="endpoint post">POST</span> <code>/oauth/token</code> —— 刷新（refresh_token 每次轮换）</p>
+  <div class="codeblock">{
+  "grant_type": "refresh_token",
+  "client_id": "…",
+  "client_secret": "…",
+  "refresh_token": "…"
+}
+→ 200 新的 access_token + refresh_token</div>
+
+  <h2 id="errors">错误说明</h2>
+  <table>
+    <tr><th>HTTP</th><th>场景</th></tr>
+    <tr><td>400</td><td>参数错误 / 应用不存在 / 回调地址不匹配 / 授权码无效或已使用</td></tr>
+    <tr><td>401</td><td>access_token 缺失、无效或过期</td></tr>
+    <tr><td>403</td><td>client_secret 错误 / 应用已吊销 / 管理站 Token 无效 / 无 write 权限</td></tr>
+    <tr><td>404</td><td>应用不存在 / 文件不存在</td></tr>
+    <tr><td>500</td><td>服务端错误（多为 KV 未绑定或 GitHub 写入失败）</td></tr>
+  </table>
+</div>
+
+<div class="footer">UTAU 配布站 · 开放平台</div>
+</body>
+</html>
