@@ -4,14 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UTAU 配布站 · 开放平台授权登录测试</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231d1d1f'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23f5c542' font-family='Arial' font-weight='900'%3EU%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="icon.png">
 <style>
   :root{--bg:#121214;--card:#1d1d1f;--card2:#242426;--line:#333336;--txt:#e8e8ea;--dim:#8b8b90;--red:#e02424;--gold:#f5c542;--gh:#f0f6fc;}
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:var(--bg);color:var(--txt);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;display:flex;flex-direction:column}
   .top{height:60px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--line);background:var(--card)}
-  .top .logo{font-weight:900;font-size:20px;color:var(--gold);letter-spacing:.5px}
-  .top .logo span{color:var(--dim);font-weight:400;font-size:13px;margin-left:10px}
+  .top .logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:20px;color:var(--gold);letter-spacing:.5px}
+  .top .logo img{width:30px;height:30px;border-radius:8px}
+  .top .logo span{color:var(--dim);font-weight:400;font-size:13px;margin-left:6px}
   .top a.back{margin-left:auto;color:var(--dim);text-decoration:none;font-size:13px}
   .top a.back:hover{color:var(--txt)}
   main{flex:1;display:flex;align-items:center;justify-content:center;padding:30px 16px}
@@ -24,7 +25,7 @@
   .op-btn .u-ico{width:19px;height:19px;border-radius:5px;background:var(--gold);color:#1a1a1a;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .tip{margin-top:16px;font-size:12px;color:var(--dim);line-height:1.7}
   .tip b{color:var(--txt);font-weight:600}
-  .avatar{width:76px;height:76px;border-radius:50%;border:2px solid var(--gold);margin:6px auto 14px;display:flex;align-items:center;justify-content:center;background:var(--card2);font-size:30px;font-weight:900;color:var(--gold)}
+  .avatar{width:96px;height:96px;border-radius:50%;margin:6px auto 14px;display:block;object-fit:cover}
   .uname{font-size:20px;font-weight:700;word-break:break-all}
   .ulogin{color:var(--dim);font-size:13px;margin:4px 0 6px;word-break:break-all}
   .ustat{display:inline-block;font-size:12px;color:#3fb950;border:1px solid #3fb950;border-radius:20px;padding:2px 10px;margin-top:4px}
@@ -45,7 +46,7 @@
 </head>
 <body>
   <div class="top">
-    <div class="logo">UTAU<span>开放平台授权登录 · 测试</span></div>
+    <div class="logo"><img src="icon.png" alt="UTAU">UTAU<span>开放平台授权登录 · 测试</span></div>
     <a class="back" href="https://songyuheng800.github.io/utau/">← 返回配布站</a>
   </div>
 
@@ -68,7 +69,7 @@
       </div>
 
       <div id="viewUser" class="hidden">
-        <div class="avatar" id="uAvatar">U</div>
+        <img class="avatar" id="uAvatar" src="icon.png" alt="UTAU">
         <div class="uname" id="uName">—</div>
         <div class="ulogin" id="uLogin"></div>
         <div><span class="ustat">已通过开放平台登录</span></div>
