@@ -79,6 +79,9 @@ export async function onRequest(context) {
     avatar: u.avatar || "",
     site: u.site || "",
     provider: "openplatform",
+    op_access_token: tokenData.access_token || "",
+    op_refresh_token: tokenData.refresh_token || "",
+    op_scope: tokenData.scope || (tokenData.scopes || []).join(" ") || "read",
     created_at: Date.now(),
   };
 
