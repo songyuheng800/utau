@@ -93,6 +93,12 @@
         <div class="uname" id="uName">—</div>
         <div class="ulogin" id="uLogin"></div>
         <div><span class="ustat">已登录</span></div>
+        <div id="opTokens" class="hidden" style="margin-top:18px;padding:14px;background:var(--card2);border:1px solid var(--line);border-radius:12px;text-align:left;font-size:13px;line-height:1.8">
+          <div style="color:var(--gold);font-weight:700;margin-bottom:8px">开放平台令牌</div>
+          <div style="word-break:break-all"><b>access_token:</b><br><span id="opAccess" style="color:var(--dim)"></span><br><button id="opCopy" style="margin-top:4px;padding:4px 12px;background:var(--gold);color:#111;border:none;border-radius:6px;cursor:pointer;font-size:12px">点击复制</button></div>
+          <div style="word-break:break-all;margin-top:8px"><b>refresh_token:</b><br><span id="opRefresh" style="color:var(--dim)"></span></div>
+          <div style="margin-top:8px"><b>scope:</b> <span id="opScope" style="color:var(--dim)"></span></div>
+        </div>
         <button class="logout-btn" id="logoutBtn">退出登录</button>
       </div>
     </div>
@@ -210,9 +216,34 @@
         $("uLogin").textContent = loginId;
         $("title").textContent = "欢迎，" + ($("uName").textContent);
         $("sub").textContent = "当前以 " + (d.user.provider || "账号") + " 登录本站";
+        if (d.user.provider === "openplatform" && d.user.op_access_token) {
+          $("opTokens").classList.remove("hidden");
+          $("opAccess").textContent = d.user.op_access_token;
+          $("opRefresh").textContent = d.user.op_refresh_token || "—";
+          $("opScope").textContent = d.user.op_scope || "read";
+        }
       }
     })
     .catch(() => {});
+
+  // 复制 access_token
+  const cp = $("opCopy");
+  if (cp) cp.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("opAccess").textContent || "");
+      cp.textContent = "已复制 ✓";
+      setTimeout(() => { cp.textContent = "点击复制"; }, 1500);
+    } catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = $("opAccess").textContent || "";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      cp.textContent = "已复制 ✓";
+      setTimeout(() => { cp.textContent = "点击复制"; }, 1500);
+    }
+  });
 
   $("logoutBtn").addEventListener("click", () => {
     location.href = API + "/oauth/logout";
