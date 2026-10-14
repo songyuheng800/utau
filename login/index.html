@@ -201,7 +201,7 @@
     const u = $("pwdUser").value.trim(), pw = $("pwdPass").value;
     if (!u || !pw) return showMsg("err", "请填写用户名和密码");
     // 敏感词检测
-    const BLOCKED = ["傻子", "傻逼", "SB", "sb", "草泥马", "他妈", "你妈", "操你", "狗日", "王八蛋", "脑残", "智障", "去死", "fuck", "shit", "bitch", "asshole", "傻逼", "脑残", "傻逼", "豆包", "doubao", "字节", "bytedance"];
+    const BLOCKED = ["傻子", "傻逼", "SB", "sb", "草泥马", "他妈", "你妈", "操你", "狗日", "王八蛋", "脑残", "智障", "去死", "fuck", "shit", "bitch", "asshole", "脑残", "傻逼"];
     const lower = u.toLowerCase();
     for (const w of BLOCKED) {
       if (lower.includes(w.toLowerCase())) {
