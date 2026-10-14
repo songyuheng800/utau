@@ -6,7 +6,8 @@
  * 3. 拉取用户信息（GET utau-4oo /api/openplatform/api/userinfo，Bearer）
  * 4. 签发会话 cookie（存 AUTH_KV，7 天），302 跳回登录页
  */
-const FRONT_ORIGIN = "https://songyuheng800.github.io";
+const FRONT_ORIGIN = "https://utau-4oo.pages.dev";
+const FRONT_LOGIN = "https://utau-4oo.pages.dev/login";
 const SESSION_TTL = 7 * 24 * 3600;
 const OP_BASE = "https://utau-4oo.pages.dev";
 
@@ -21,7 +22,7 @@ export async function onRequest(context) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
-  const fail = (why) => Response.redirect(`${FRONT_ORIGIN}/utau/login/?err=${encodeURIComponent(why)}`, 302);
+  const fail = (why) => Response.redirect(`${FRONT_LOGIN}/?err=${encodeURIComponent(why)}`, 302);
 
   if (!code || !state) return fail("缺少 code 或 state");
   if (!kv || !CLIENT_ID || !CLIENT_SECRET) return fail("服务未配置");
@@ -95,7 +96,7 @@ export async function onRequest(context) {
   const cookie = `utau_session=${token}; Path=/; Max-Age=${SESSION_TTL}; Secure; HttpOnly; SameSite=None`;
   return new Response(null, {
     status: 302,
-    headers: { Location: `${FRONT_ORIGIN}/utau/login/?ok=1`, "Set-Cookie": cookie },
+    headers: { Location: `${FRONT_LOGIN}/?ok=1`, "Set-Cookie": cookie },
   });
 }
 
