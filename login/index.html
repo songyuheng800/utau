@@ -163,42 +163,7 @@
     openplatform: { name: "开放平台", cls: "op", href: "https://songyuheng800.github.io/utau/openplatform/authorize.html?client_id=611570dbd82bd020b527c326b89b15f4&redirect_uri=https%3A%2F%2Futau-catbox-test.pages.dev%2Fapi%2Foauth%2Fopenplatform%2Fcallback&scope=read&state=utau_login", icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5.25 3.75 10.15 8 11 4.25-.85 8-5.75 8-11V5l-8-3zm0 2.18 6 2.25V11c0 4.28-2.64 8.4-6 9.9-3.36-1.5-6-5.62-6-9.9V6.43l6-2.25z"/><circle cx="12" cy="10.5" r="2"/><path d="M8.6 16.2c0-1.88 1.52-3.4 3.4-3.4s3.4 1.52 3.4 3.4v.9H8.6v-.9z"/></svg>' }
   };
 
-  // 动态渲染已启用的第三方登录
-  fetch(API + "/oauth/providers")
-    .then(r => r.json())
-    .then(d => {
-      const box = $("oauthBtns");
-      let list = (d && d.providers) || ["github", "password"];
-      // 开放平台固定启用，排在最前面
-      list = list.filter(id => id !== "openplatform");
-      list.unshift("openplatform");
-      list.forEach(id => {
-        const cfg = BTNS[id];
-        if (!cfg) return;
-        const a = document.createElement("a");
-        a.className = "gh-btn" + (cfg.cls ? " " + cfg.cls : "");
-        a.href = cfg.href;
-        a.innerHTML = cfg.icon + "<span>使用 " + cfg.name + " 登录</span>";
-        box.appendChild(a);
-      });
-      // GitHub 兜底（providers 接口异常时也保证有按钮）
-      if (!list.includes("github")) {
-        const cfg = BTNS.github;
-        const a = document.createElement("a");
-        a.className = "gh-btn";
-        a.href = cfg.href;
-        a.innerHTML = cfg.icon + "<span>使用 GitHub 登录</span>";
-        box.appendChild(a);
-      }
-    })
-    .catch(() => {
-      const cfg = BTNS.github;
-      const a = document.createElement("a");
-      a.className = "gh-btn";
-      a.href = cfg.href;
-      a.innerHTML = cfg.icon + "<span>使用 GitHub 登录</span>";
-      $("oauthBtns").appendChild(a);
-    });
+  // 按钮已写死在 HTML 里，不再动态渲染
 
   // 密码登录 / 注册
   async function pwdReq(path, body) {
