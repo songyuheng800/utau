@@ -140,18 +140,14 @@
     <div class="nav-links">
       <a href="/utau/logindevelop/" class="active">概览</a>
       <a href="/utau/logindevelop/server/">服务器配置</a>
-      <a href="/utau/openplatform/docs.html">API 文档</a>
-      <a href="/utau/openplatform/apps.html">我的应用</a>
-      <a href="/utau/openplatform/register.html">创建应用</a>
     </div>
-    <a href="/utau/login/" class="nav-login">登录控制台</a>
   </div>
 </nav>
 
 <!-- Hero -->
 <section class="hero">
-  <h1>为开发者打造的 <span>UTAU 开放平台</span></h1>
-  <p>标准 OAuth 2.0 授权流程，完整 RESTful API，让你的第三方应用轻松接入 UTAU 配布站的工程与声库资源。</p>
+  <h1>UTAU <span>开发者平台</span></h1>
+  <p>为开发者提供的工具集：服务器配置、API 管理、状态监控、敏感词检测。独立运行，不依赖其他平台。</p>
   <div class="hero-btns">
     <a href="/utau/openplatform/register.html" class="btn btn-gold">立即创建应用</a>
     <a href="/utau/openplatform/docs.html" class="btn btn-outline">阅读 API 文档</a>
@@ -291,31 +287,25 @@
 
   <!-- 常用链接 -->
   <section class="section">
-    <h2 class="section-title">开发者入口</h2>
+    <h2 class="section-title">开发者工具</h2>
     <div class="grid">
-      <div class="card">
-        <div class="card-icon">🚀</div>
-        <h3>新开发者？</h3>
-        <p>注册应用，获取你的第一对密钥</p>
-        <a href="/utau/openplatform/register.html" class="card-link">创建应用 →</a>
-      </div>
-      <div class="card">
-        <div class="card-icon">📖</div>
-        <h3>查文档</h3>
-        <p>完整 API 参考、错误码、权限说明</p>
-        <a href="/utau/openplatform/docs.html" class="card-link">打开文档 →</a>
-      </div>
-      <div class="card">
-        <div class="card-icon">🔧</div>
-        <h3>管理应用</h3>
-        <p>查看密钥、重置 secret、配置回调</p>
-        <a href="/utau/openplatform/apps.html" class="card-link">我的应用 →</a>
-      </div>
       <div class="card">
         <div class="card-icon">🖥️</div>
         <h3>服务器配置</h3>
-        <p>环境切换、API 地址、安全设置、连接测试</p>
-        <a href="/utau/logindevelop/server/" class="card-link">服务器配置 →</a>
+        <p>环境切换、API 地址、安全设置、连接测试，实时读写 KV</p>
+        <a href="/utau/logindevelop/server/" class="card-link">打开配置 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h3>敏感词检测</h3>
+        <p>Trie 树引擎 + 谐音变体 + 正则模式，实时检测文本</p>
+        <a href="/utau/sensitive/" class="card-link">打开检测 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3>状态监控</h3>
+        <p>API 连接状态、延迟、封禁账号、安全开关一览</p>
+        <a href="/utau/logindevelop/server/" class="card-link">查看状态 →</a>
       </div>
     </div>
   </section>
