@@ -190,21 +190,24 @@
   $("pwdRegBtn").addEventListener("click", () => {
     const u = $("pwdUser").value.trim(), pw = $("pwdPass").value;
     if (!u || !pw) return showMsg("err", "请填写用户名和密码");
-    // 敏感词检测（升级版：谐音 + 组合）
-    const BLOCKED = ["傻子", "傻逼", "sb", "草泥马", "他妈", "你妈", "操你", "狗日",
-      "王八蛋", "脑残", "智障", "去死", "fuck", "shit", "bitch", "asshole",
-      "妈逼", "妈了", "妈没", "妈死", "妈蛋", "草泥", "操你", "草你", "日你",
-      "干你", "尼玛", "泥马", "煞笔", "沙比", "婊子", "废物", "垃圾", "贱",
-      "鸡巴", "鸡吧", "几把", "jiba", "jb", "屌", "鸡鸡"];
+    // 敏感词检测 v3：大词库 + 正则模式
+    const BLOCKED = ["傻逼","傻子","sb","草泥马","操你妈","他妈","你妈","操你","草你","狗日",
+      "王八蛋","脑残","智障","去死","废物","垃圾","贱","婊子","贱人","骚货",
+      "妈逼","妈了","妈没","妈死","妈蛋","妈卖批","草泥","日你","干你",
+      "尼玛","泥马","煞笔","沙比","鸡巴","鸡吧","几把","jiba","jb","屌","鸡鸡",
+      "fuck","shit","bitch","asshole","cunt","damn","bastard","滚","弄死"];
     const lower = u.toLowerCase();
     for (const w of BLOCKED) {
       if (lower.includes(w.toLowerCase())) {
         return showMsg("err", "用户名包含不文明词汇，请换一个");
       }
     }
-    // 谐音组合检测
-    if (/妈[没死蛋逼了卖]/.test(u)) return showMsg("err", "用户名包含不文明词汇，请换一个");
-    if (/(操|草|日|干)(你|他|她|妈|娘|姐|妹)/.test(u)) return showMsg("err", "用户名包含不文明词汇，请换一个");
+    // 正则模式
+    const PATTERNS = [/妈[没死蛋逼了卖操了个批的]/, /[操草日干靠][你他她妈娘姐妹哥弟爸]/,
+      /傻[子逼b13x屄了]/, /[草操][泥你][马妈]/, /鸡[巴吧逼吧叭]/, /狗[日娘东西]/, /s\s*b/i];
+    for (const re of PATTERNS) {
+      if (re.test(u)) return showMsg("err", "用户名包含不文明词汇，请换一个");
+    }
     pwdReq("/auth/register", { username: u, password: pw });
   });
   $("pwdPass").addEventListener("keydown", (e) => {
