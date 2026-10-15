@@ -149,8 +149,8 @@
   <h1>UTAU <span>开发者平台</span></h1>
   <p>为开发者提供的工具集：服务器配置、API 管理、状态监控、敏感词检测。独立运行，不依赖其他平台。</p>
   <div class="hero-btns">
-    <a href="/utau/openplatform/register.html" class="btn btn-gold">立即创建应用</a>
-    <a href="/utau/openplatform/docs.html" class="btn btn-outline">阅读 API 文档</a>
+    <a href="/utau/logindevelop/server/" class="btn btn-gold">打开服务器配置</a>
+    <a href="/utau/sensitive/" class="btn btn-outline">敏感词检测工具</a>
   </div>
 </section>
 
@@ -221,43 +221,43 @@
   <!-- 功能特性 -->
   <section class="section">
     <h2 class="section-title">平台功能</h2>
-    <p class="section-desc">完整的开发者工具链，从接入到上线全流程支持</p>
+    <p class="section-desc">开发者工具集，独立运行，不依赖其他平台</p>
     <div class="grid">
       <div class="card">
-        <div class="card-icon">🔐</div>
-        <h3>OAuth 2.0 授权</h3>
-        <p>标准授权码模式，支持 GitHub / Google / Discord / Gitee / 华为 / 开放平台六种登录方式</p>
-        <a href="/utau/openplatform/authorize.html" class="card-link">了解授权流程 →</a>
-      </div>
-      <div class="card">
-        <div class="card-icon">📁</div>
-        <h3>工程文件 API</h3>
-        <p>读写用户的 UTAU 工程文件、声库资源，支持上传下载删除全操作</p>
-        <a href="/utau/openplatform/docs.html" class="card-link">查看文件接口 →</a>
-      </div>
-      <div class="card">
-        <div class="card-icon">👤</div>
-        <h3>用户信息 API</h3>
-        <p>获取用户基本信息：用户名、头像、注册时间，支持 openid 唯一标识</p>
-        <a href="/utau/openplatform/docs.html#userinfo" class="card-link">查看用户接口 →</a>
-      </div>
-      <div class="card">
-        <div class="card-icon">🔑</div>
-        <h3>Token 管理</h3>
-        <p>access_token 7天有效期，refresh_token 自动续期，密钥安全存储</p>
-        <a href="/utau/openplatform/docs.html#token" class="card-link">查看 Token 机制 →</a>
+        <div class="card-icon">🖥️</div>
+        <h3>服务器配置</h3>
+        <p>环境切换、API 地址管理、安全开关、连接测试，配置实时读写 KV</p>
+        <a href="/utau/logindevelop/server/" class="card-link">打开配置 →</a>
       </div>
       <div class="card">
         <div class="card-icon">🛡️</div>
         <h3>敏感词检测</h3>
-        <p>内置敏感词检测 API，自动过滤不文明用户名和内容，支持谐音变体检测</p>
-        <a href="/utau/sensitive/" class="card-link">试试检测工具 →</a>
+        <p>Trie 树引擎 + 谐音变体 + 正则模式，实时检测文本是否包含违规内容</p>
+        <a href="/utau/sensitive/" class="card-link">打开检测 →</a>
       </div>
       <div class="card">
         <div class="card-icon">📊</div>
-        <h3>应用管理</h3>
-        <p>在线管理你的应用：查看密钥、重置 secret、修改回调地址、查看用量</p>
-        <a href="/utau/openplatform/apps.html" class="card-link">进入应用管理 →</a>
+        <h3>状态监控</h3>
+        <p>API 连接状态、响应延迟、封禁账号列表、安全开关一览</p>
+        <a href="/utau/logindevelop/server/" class="card-link">查看状态 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔑</div>
+        <h3>Token 管理</h3>
+        <p>管理站 Token 生成与同步，凭 Token 直接登录管理后台</p>
+        <a href="/utau/admin/token/" class="card-link">Token 工具 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">🚫</div>
+        <h3>账号封禁</h3>
+        <p>查看已封禁账号列表，封禁后登录直接拒绝并提示</p>
+        <a href="/utau/logindevelop/server/" class="card-link">查看封禁列表 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚙️</div>
+        <h3>环境管理</h3>
+        <p>生产/开发/预发布环境切换，API 地址自动跟随环境变化</p>
+        <a href="/utau/logindevelop/server/" class="card-link">切换环境 →</a>
       </div>
     </div>
   </section>
