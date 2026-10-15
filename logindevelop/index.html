@@ -221,8 +221,38 @@
   <!-- 功能特性 -->
   <section class="section">
     <h2 class="section-title">平台功能</h2>
-    <p class="section-desc">开发者工具集，独立运行，不依赖其他平台</p>
+    <p class="section-desc">开发者工具集，全部功能由开发平台自主提供</p>
     <div class="grid">
+      <div class="card">
+        <div class="card-icon">🔐</div>
+        <h3>OAuth 2.0 授权</h3>
+        <p>标准授权码模式，支持 GitHub / Google / Discord / Gitee / 华为多种登录方式</p>
+        <a href="/utau/logindevelop/server/" class="card-link">授权配置 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">📁</div>
+        <h3>工程文件 API</h3>
+        <p>读写工程文件、声库资源，支持上传下载删除全操作</p>
+        <a href="/utau/logindevelop/server/" class="card-link">接口配置 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">👤</div>
+        <h3>用户信息 API</h3>
+        <p>获取用户基本信息：用户名、头像、注册时间，支持 openid 唯一标识</p>
+        <a href="/utau/logindevelop/server/" class="card-link">接口配置 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔑</div>
+        <h3>Token 管理</h3>
+        <p>access_token 7天有效期，refresh_token 自动续期，密钥安全存储</p>
+        <a href="/utau/admin/token/" class="card-link">Token 工具 →</a>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h3>敏感词检测</h3>
+        <p>Trie 树引擎 + 谐音变体 + 正则模式，自动过滤不文明内容</p>
+        <a href="/utau/sensitive/" class="card-link">打开检测 →</a>
+      </div>
       <div class="card">
         <div class="card-icon">🖥️</div>
         <h3>服务器配置</h3>
@@ -230,22 +260,10 @@
         <a href="/utau/logindevelop/server/" class="card-link">打开配置 →</a>
       </div>
       <div class="card">
-        <div class="card-icon">🛡️</div>
-        <h3>敏感词检测</h3>
-        <p>Trie 树引擎 + 谐音变体 + 正则模式，实时检测文本是否包含违规内容</p>
-        <a href="/utau/sensitive/" class="card-link">打开检测 →</a>
-      </div>
-      <div class="card">
         <div class="card-icon">📊</div>
         <h3>状态监控</h3>
         <p>API 连接状态、响应延迟、封禁账号列表、安全开关一览</p>
         <a href="/utau/logindevelop/server/" class="card-link">查看状态 →</a>
-      </div>
-      <div class="card">
-        <div class="card-icon">🔑</div>
-        <h3>Token 管理</h3>
-        <p>管理站 Token 生成与同步，凭 Token 直接登录管理后台</p>
-        <a href="/utau/admin/token/" class="card-link">Token 工具 →</a>
       </div>
       <div class="card">
         <div class="card-icon">🚫</div>
