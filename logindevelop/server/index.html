@@ -12,21 +12,11 @@
     --radius: 12px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    line-height: 1.6;
-  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
   a { color: var(--blue); text-decoration: none; }
 
-  .nav {
-    background: var(--card); border-bottom: 1px solid var(--line);
-    padding: 0 24px; position: sticky; top: 0; z-index: 100;
-  }
-  .nav-inner {
-    max-width: 1200px; margin: 0 auto;
-    display: flex; align-items: center; justify-content: space-between; height: 60px;
-  }
+  .nav { background: var(--card); border-bottom: 1px solid var(--line); padding: 0 24px; position: sticky; top: 0; z-index: 100; }
+  .nav-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 60px; }
   .logo { font-size: 20px; font-weight: 800; }
   .logo span { color: var(--gold); }
   .nav-links { display: flex; gap: 24px; }
@@ -37,82 +27,44 @@
   .page-title { font-size: 28px; margin-bottom: 8px; }
   .page-desc { color: var(--dim); margin-bottom: 32px; }
 
-  .card {
-    background: var(--card); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
-  }
-  .card-title {
-    font-size: 16px; font-weight: 700; margin-bottom: 16px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .card-title .icon { font-size: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 
   .form-group { margin-bottom: 16px; }
-  .form-group label {
-    display: block; font-size: 13px; color: var(--dim); margin-bottom: 6px;
-  }
+  .form-group label { display: block; font-size: 13px; color: var(--dim); margin-bottom: 6px; }
   .form-group input, .form-group select {
     width: 100%; padding: 10px 14px; background: var(--card2);
-    border: 1px solid var(--line); border-radius: 8px;
-    color: var(--text); font-size: 14px; outline: none;
-    font-family: inherit;
+    border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; font-family: inherit;
   }
   .form-group input:focus { border-color: var(--gold); }
-  .form-group input[readonly] { opacity: .6; }
   .form-group .hint { font-size: 12px; color: var(--dim); margin-top: 4px; }
 
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
 
-  .btn {
-    display: inline-block; padding: 10px 24px; border-radius: 8px;
-    font-size: 14px; font-weight: 600; cursor: pointer; border: none;
-    transition: all .2s;
-  }
+  .btn { display: inline-block; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all .2s; }
   .btn-gold { background: var(--gold); color: #111; }
   .btn-gold:hover { background: #f7d567; }
   .btn-outline { background: transparent; color: var(--dim); border: 1px solid var(--line); }
   .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
-  .btn-row { display: flex; gap: 12px; margin-top: 20px; }
+  .btn-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 
-  .status-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 0; border-bottom: 1px solid var(--line);
-  }
+  .status-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
   .status-item:last-child { border-bottom: none; }
   .status-label { color: var(--dim); font-size: 14px; }
   .status-value { font-weight: 600; font-size: 14px; }
   .status-ok { color: var(--green); }
-  .status-warn { color: var(--gold); }
   .status-err { color: var(--red); }
 
-  .badge {
-    display: inline-block; padding: 2px 10px; border-radius: 20px;
-    font-size: 12px; font-weight: 600;
-  }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
   .badge-green { background: rgba(63,185,80,.15); color: var(--green); }
-  .badge-yellow { background: rgba(245,197,66,.15); color: var(--gold); }
+  .badge-red { background: rgba(248,81,73,.15); color: var(--red); }
 
-  .toggle {
-    position: relative; width: 44px; height: 24px;
-    background: var(--card2); border-radius: 20px; cursor: pointer;
-    transition: background .2s;
-  }
-  .toggle.on { background: var(--green); }
-  .toggle::after {
-    content: ''; position: absolute; top: 2px; left: 2px;
-    width: 20px; height: 20px; border-radius: 50%; background: #fff;
-    transition: transform .2s;
-  }
-  .toggle.on::after { transform: translateX(20px); }
-
-  .toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: var(--green); color: #fff; padding: 12px 24px;
-    border-radius: 8px; font-size: 14px; font-weight: 600;
-    opacity: 0; transition: opacity .3s; pointer-events: none;
-  }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--green); color: #fff; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; opacity: 0; transition: opacity .3s; pointer-events: none; }
   .toast.show { opacity: 1; }
+  .toast.err { background: var(--red); }
+
+  .loading { text-align: center; padding: 40px; color: var(--dim); }
 </style>
 </head>
 <body>
@@ -131,178 +83,176 @@
 
 <div class="container">
   <h1 class="page-title">服务器配置</h1>
-  <p class="page-desc">管理 API 服务器地址、环境、回调和安全设置</p>
+  <p class="page-desc">实时读取后端配置，修改后保存到 KV，立即生效</p>
 
-  <!-- 服务器状态 -->
-  <div class="card">
-    <div class="card-title"><span class="icon">📊</span> 服务器状态</div>
-    <div class="status-item">
-      <span class="status-label">主 API 服务（开放平台 OAuth）</span>
-      <span class="status-value status-ok">● 运行中</span>
-    </div>
-    <div class="status-item">
-      <span class="status-label">登录服务（第三方 OAuth + 密码）</span>
-      <span class="status-value status-ok">● 运行中</span>
-    </div>
-    <div class="status-item">
-      <span class="status-label">静态托管（GitHub Pages）</span>
-      <span class="status-value status-ok">● 运行中</span>
-    </div>
-    <div class="status-item">
-      <span class="status-label">KV 存储（AUTH_KV / TOKENS）</span>
-      <span class="status-value status-ok">● 正常</span>
-    </div>
-    <div class="status-item">
-      <span class="status-label">平均响应延迟</span>
-      <span class="status-value">~80ms</span>
-    </div>
-    <div class="status-item">
-      <span class="status-label">今日 API 调用量</span>
-      <span class="status-value">1,247 次</span>
-    </div>
-  </div>
+  <div id="loading" class="loading">正在加载配置...</div>
+  <div id="content" style="display:none">
 
-  <!-- 环境配置 -->
-  <div class="card">
-    <div class="card-title"><span class="icon">⚙️</span> 环境配置</div>
-    <div class="form-group">
-      <label>当前环境</label>
-      <select id="env">
-        <option value="prod" selected>生产环境 (Production)</option>
-        <option value="dev">开发环境 (Development)</option>
-        <option value="staging">预发布 (Staging)</option>
-      </select>
-      <div class="hint">切换环境会改变 API 端点地址</div>
+    <!-- 服务器状态 -->
+    <div class="card">
+      <div class="card-title">📊 实时服务器状态</div>
+      <div class="status-item">
+        <span class="status-label">API 连接</span>
+        <span class="status-value" id="connStatus">检测中...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">当前环境</span>
+        <span class="status-value" id="envStatus">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">已封禁账号数</span>
+        <span class="status-value" id="bannedCount">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">敏感词检测</span>
+        <span class="status-value" id="sensitiveStatus">-</span>
+      </div>
     </div>
-    <div class="row">
+
+    <!-- 环境配置 -->
+    <div class="card">
+      <div class="card-title">⚙️ 环境配置</div>
       <div class="form-group">
-        <label>开放平台 API 地址</label>
-        <input type="text" id="apiOpen" value="https://utau-4oo.pages.dev" readonly>
+        <label>当前环境</label>
+        <select id="cfg-env">
+          <option value="prod">生产环境 (Production)</option>
+          <option value="dev">开发环境 (Development)</option>
+          <option value="staging">预发布 (Staging)</option>
+        </select>
       </div>
-      <div class="form-group">
-        <label>登录服务 API 地址</label>
-        <input type="text" id="apiAuth" value="https://utau-catbox-test.pages.dev/api" readonly>
+      <div class="row">
+        <div class="form-group">
+          <label>开放平台 API 地址</label>
+          <input type="text" id="cfg-api-open">
+        </div>
+        <div class="form-group">
+          <label>登录服务 API 地址</label>
+          <input type="text" id="cfg-api-auth">
+        </div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>前端域名</label>
+          <input type="text" id="cfg-domain">
+        </div>
+        <div class="form-group">
+          <label>默认 redirect_uri</label>
+          <input type="text" id="cfg-redirect">
+        </div>
       </div>
     </div>
-    <div class="row">
-      <div class="form-group">
-        <label>前端域名</label>
-        <input type="text" id="domain" value="songyuheng800.github.io/utau" readonly>
-      </div>
-      <div class="form-group">
-        <label>API 版本</label>
-        <input type="text" value="v1.0" readonly>
-      </div>
-    </div>
-  </div>
 
-  <!-- OAuth / 回调配置 -->
-  <div class="card">
-    <div class="card-title"><span class="icon">🔗</span> OAuth 回调配置</div>
-    <div class="form-group">
-      <label>授权页地址</label>
-      <input type="text" value="https://songyuheng800.github.io/utau/openplatform/authorize.html" readonly>
+    <!-- 安全配置 -->
+    <div class="card">
+      <div class="card-title">🛡️ 安全配置</div>
+      <div class="status-item">
+        <div><div style="font-weight:600">CORS 跨域</div></div>
+        <span class="badge badge-green" id="cfg-cors">已启用</span>
+      </div>
+      <div class="status-item">
+        <div><div style="font-weight:600">敏感词检测</div></div>
+        <span class="badge badge-green" id="cfg-sensitive">已启用</span>
+      </div>
+      <div class="status-item">
+        <div><div style="font-weight:600">HTTPS 强制</div></div>
+        <span class="badge badge-green" id="cfg-https">已启用</span>
+      </div>
+      <div class="status-item">
+        <div><div style="font-weight:600">已封禁账号</div><div class="hint" style="margin-top:2px" id="cfg-banned-list">-</div></div>
+      </div>
     </div>
-    <div class="form-group">
-      <label>Token 端点</label>
-      <input type="text" value="https://utau-4oo.pages.dev/oauth/token" readonly>
-    </div>
-    <div class="form-group">
-      <label>默认 redirect_uri</label>
-      <input type="text" value="https://songyuheng800.github.io/utau/login/" readonly>
-    </div>
-  </div>
 
-  <!-- 安全配置 -->
-  <div class="card">
-    <div class="card-title"><span class="icon">🛡️</span> 安全配置</div>
-    <div class="status-item">
-      <div>
-        <div style="font-weight:600">CORS 白名单</div>
-        <div class="hint" style="margin-top:2px">允许跨域请求的域名</div>
-      </div>
-      <span class="badge badge-green">已启用</span>
+    <!-- 操作按钮 -->
+    <div class="btn-row">
+      <button class="btn btn-gold" onclick="saveConfig()">💾 保存配置</button>
+      <button class="btn btn-outline" onclick="testConn()">🔌 测试连接</button>
+      <button class="btn btn-outline" onclick="loadConfig()">🔄 重新加载</button>
     </div>
-    <div class="status-item">
-      <div>
-        <div style="font-weight:600">敏感词检测</div>
-        <div class="hint" style="margin-top:2px">Trie树 + 谐音 + 变体检测</div>
-      </div>
-      <span class="badge badge-green">已启用</span>
-    </div>
-    <div class="status-item">
-      <div>
-        <div style="font-weight:600">账号黑名单</div>
-        <div class="hint" style="margin-top:2px">已封禁 2 个账号</div>
-      </div>
-      <span class="badge badge-yellow">2 个</span>
-    </div>
-    <div class="status-item">
-      <div>
-        <div style="font-weight:600">HTTPS 强制</div>
-        <div class="hint" style="margin-top:2px">所有请求强制 HTTPS</div>
-      </div>
-      <span class="badge badge-green">已启用</span>
-    </div>
-    <div class="status-item">
-      <div>
-        <div style="font-weight:600">Session Cookie 安全</div>
-        <div class="hint" style="margin-top:2px">HttpOnly + Secure + SameSite=None</div>
-      </div>
-      <span class="badge badge-green">已启用</span>
-    </div>
-  </div>
-
-  <!-- 操作 -->
-  <div class="btn-row">
-    <button class="btn btn-gold" onclick="testConn()">测试连接</button>
-    <button class="btn btn-outline" onclick="saveConfig()">保存配置</button>
-    <button class="btn btn-outline" onclick="location.href='/utau/logindevelop/'">返回概览</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-function showToast(msg) {
+const API = "https://utau-catbox-test.pages.dev/api";
+
+function showToast(msg, err) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
+  t.className = 'toast show' + (err ? ' err' : '');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function loadConfig() {
+  try {
+    const r = await fetch(API + "/server-config");
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.msg);
+    const c = d.config;
+    document.getElementById('cfg-env').value = c.env;
+    document.getElementById('cfg-api-open').value = c.api_open_url;
+    document.getElementById('cfg-api-auth').value = c.api_auth_url;
+    document.getElementById('cfg-domain').value = c.frontend_domain;
+    document.getElementById('cfg-redirect').value = c.default_redirect;
+    document.getElementById('envStatus').textContent = c.env === 'prod' ? '生产环境' : c.env === 'dev' ? '开发环境' : '预发布';
+    document.getElementById('bannedCount').textContent = (c.banned_accounts || []).length + ' 个';
+    document.getElementById('cfg-banned-list').textContent = (c.banned_accounts || []).join('、');
+    document.getElementById('cfg-cors').textContent = c.cors_enabled ? '已启用' : '已关闭';
+    document.getElementById('cfg-sensitive').textContent = c.sensitive_check_enabled ? '已启用' : '已关闭';
+    document.getElementById('cfg-https').textContent = c.https_force ? '已启用' : '已关闭';
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    testConn();
+  } catch (e) {
+    showToast('加载失败: ' + e.message, true);
+  }
+}
+
+async function saveConfig() {
+  const body = {
+    env: document.getElementById('cfg-env').value,
+    api_open_url: document.getElementById('cfg-api-open').value,
+    api_auth_url: document.getElementById('cfg-api-auth').value,
+    frontend_domain: document.getElementById('cfg-domain').value,
+    default_redirect: document.getElementById('cfg-redirect').value,
+  };
+  try {
+    const r = await fetch(API + "/server-config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.ok) showToast('✓ 配置已保存到 KV，立即生效');
+    else showToast('保存失败: ' + d.msg, true);
+  } catch (e) {
+    showToast('保存失败: ' + e.message, true);
+  }
 }
 
 async function testConn() {
-  showToast('正在测试连接...');
+  const el = document.getElementById('connStatus');
+  el.textContent = '检测中...';
+  el.className = 'status-value';
   try {
-    const r = await fetch('https://utau-catbox-test.pages.dev/api/oauth/providers');
+    const start = Date.now();
+    const r = await fetch(API + "/oauth/providers");
     const d = await r.json();
-    if (d.ok) showToast('✓ API 连接正常，' + d.providers.length + ' 个登录方式可用');
-    else showToast('✗ 连接异常');
+    const ms = Date.now() - start;
+    if (d.ok) {
+      el.textContent = '● 正常 · ' + ms + 'ms';
+      el.className = 'status-value status-ok';
+    } else {
+      el.textContent = '● 异常';
+      el.className = 'status-value status-err';
+    }
   } catch (e) {
-    showToast('✗ 连接失败: ' + e.message);
+    el.textContent = '● 连接失败';
+    el.className = 'status-value status-err';
   }
 }
 
-function saveConfig() {
-  showToast('✓ 配置已保存');
-}
-
-// 环境切换
-document.getElementById('env').addEventListener('change', function() {
-  const env = this.value;
-  if (env === 'prod') {
-    document.getElementById('apiOpen').value = 'https://utau-4oo.pages.dev';
-    document.getElementById('apiAuth').value = 'https://utau-catbox-test.pages.dev/api';
-  } else if (env === 'dev') {
-    document.getElementById('apiOpen').value = 'https://dev-utau.pages.dev';
-    document.getElementById('apiAuth').value = 'https://dev-utau-catbox.pages.dev/api';
-  } else {
-    document.getElementById('apiOpen').value = 'https://staging-utau.pages.dev';
-    document.getElementById('apiAuth').value = 'https://staging-utau-catbox.pages.dev/api';
-  }
-  showToast('已切换到 ' + this.options[this.selectedIndex].text);
-});
+loadConfig();
 </script>
-
 </body>
 </html>
