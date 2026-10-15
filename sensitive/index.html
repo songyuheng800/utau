@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>敏感词检测 - UTAU 配布站</title>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --card2: #21262d;
+    --line: #30363d; --text: #e6edf3; --dim: #8b949e;
+    --gold: #f5c542; --red: #f85149; --green: #3fb950;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh; padding: 20px;
+  }
+  .container { max-width: 700px; margin: 0 auto; }
+  .top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 0; margin-bottom: 24px;
+  }
+  .logo { font-size: 22px; font-weight: 800; }
+  .logo span { color: var(--gold); }
+  .back { color: var(--dim); text-decoration: none; font-size: 14px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px; margin-bottom: 16px;
+  }
+  h1 { font-size: 24px; margin-bottom: 8px; }
+  .sub { color: var(--dim); font-size: 14px; margin-bottom: 20px; }
+  textarea {
+    width: 100%; min-height: 120px; background: var(--card2);
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+    color: var(--text); font-size: 15px; resize: vertical;
+    font-family: inherit; outline: none;
+  }
+  textarea:focus { border-color: var(--gold); }
+  .btn {
+    display: inline-block; padding: 12px 28px; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 12px;
+  }
+  .btn-primary { background: var(--gold); color: #111; }
+  .btn-primary:hover { background: #f7d567; }
+  .result {
+    margin-top: 20px; padding: 16px; border-radius: 10px;
+    display: none;
+  }
+  .result.ok { background: rgba(63,185,80,.1); border: 1px solid var(--green); display: block; }
+  .result.bad { background: rgba(248,81,73,.1); border: 1px solid var(--red); display: block; }
+  .result-title { font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+  .result.ok .result-title { color: var(--green); }
+  .result.bad .result-title { color: var(--red); }
+  .word-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .word-tag {
+    background: rgba(248,81,73,.15); color: var(--red);
+    padding: 4px 12px; border-radius: 6px; font-size: 13px;
+  }
+  .stats { color: var(--dim); font-size: 13px; margin-top: 10px; }
+  .footer { text-align: center; color: var(--dim); font-size: 12px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <div class="logo">UTAU<span>敏感词检测</span></div>
+    <a class="back" href="/utau/login/">← 返回</a>
+  </div>
+
+  <div class="card">
+    <h1>敏感词检测</h1>
+    <p class="sub">输入文本，检测是否包含敏感词、辱骂、违规内容。支持变体/谐音/分隔符绕过检测。</p>
+    <textarea id="text" placeholder="输入要检测的文本..."></textarea>
+    <button class="btn btn-primary" id="checkBtn">开始检测</button>
+    <div class="result" id="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div id="resultDesc"></div>
+      <div class="word-tags" id="wordTags"></div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+
+  <div class="footer">UTAU 配布站 · 敏感词检测系统 v1.0</div>
+</div>
+
+<script>
+const API = "https://utau-catbox-test.pages.dev/api";
+const $ = id => document.getElementById(id);
+
+$("checkBtn").addEventListener("click", async () => {
+  const text = $("text").value.trim();
+  if (!text) return alert("请输入文本");
+  $("checkBtn").textContent = "检测中...";
+  $("checkBtn").disabled = true;
+
+  try {
+    const r = await fetch(API + "/sensitive-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const d = await r.json();
+    showResult(d);
+  } catch (e) {
+    alert("检测失败：" + e.message);
+  }
+
+  $("checkBtn").textContent = "开始检测";
+  $("checkBtn").disabled = false;
+});
+
+function showResult(d) {
+  const box = $("result");
+  if (!d.hit) {
+    box.className = "result ok";
+    $("resultTitle").textContent = "✓ 未检测到敏感词";
+    $("resultDesc").textContent = "文本通过检测，可以正常使用。";
+    $("wordTags").innerHTML = "";
+  } else {
+    box.className = "result bad";
+    $("resultTitle").textContent = "✗ 检测到 " + d.count + " 个敏感词";
+    $("resultDesc").textContent = "文本包含以下敏感内容，已被拦截：";
+    $("wordTags").innerHTML = d.words.map(w => `<span class="word-tag">${w}</span>`).join("");
+  }
+  $("stats").textContent = `文本长度：${d.text_length} 字符 · 检测时间：${new Date().toLocaleTimeString()}`;
+}
+
+// 回车快捷键
+$("text").addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("checkBtn").click();
+});
+</script>
+</body>
+</html>
