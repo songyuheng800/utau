@@ -289,7 +289,11 @@ async function loadFileList() {
   } catch (err) {
     setMsg("加载文件列表失败：" + err.message, "error");
   }
-  const files = [...oldFiles, ...shardFiles];
+  // 按文件名去重：同名优先显示 D1 版本（已迁移），旧 GitHub 副本不重复列出
+  const byName = new Map();
+  for (const f of oldFiles) byName.set(f.name, f);
+  for (const f of shardFiles) byName.set(f.name, f);
+  const files = [...byName.values()];
   renderList("list-ust", files, ["ust"]);
   renderList("list-ustx", files, ["ustx"]);
   renderList("list-vocaloid", files, ["vsq", "vsqx", "vpr", "pp2", "pp3"]);
