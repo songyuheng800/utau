@@ -95,7 +95,11 @@ $("listBtn").onclick = async () => {
     const dl=document.createElement("a"); dl.href=`${API}/file?fileId=${f.fileId}`; dl.textContent="下载";
     const del=document.createElement("button"); del.textContent="删除"; del.style.marginLeft="8px";
     del.onclick=async()=>{
-      const res=await fetch(`${API}/file?fileId=${f.fileId}`,{method:"DELETE"});
+      const res=await fetch(`${API}/delete?fileId=${f.fileId}`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json",Accept:"application/json"},
+        body:JSON.stringify({fileId:f.fileId})
+      });
       const j=await res.json(); setStatus(j.msg||"", j.ok?"ok":"err"); $("listBtn").click();
     };
     right.appendChild(dl); right.appendChild(del);
