@@ -43,6 +43,12 @@
   <input type="file" id="fileIn" multiple>
 </div>
 
+<div class="agree-box" style="font-size:14px">
+  存储位置：
+  <label><input type="radio" name="store" value="old" checked> GitHub 仓库（≤50MB）</label>
+  <label style="margin-left:14px"><input type="radio" name="store" value="d1"> D1 分片存储（≤500MB，大文件推荐）</label>
+</div>
+
 <div class="agree-box">
   <label><input type="checkbox" id="agree"> 我承诺我在二次发布时会标注来自哪里的网站取得的文件，若我违规上面的条约，我同意承担所有法律责任</label>
 </div>
@@ -59,8 +65,12 @@
 </div>
 
 <script>
-// ★★★ 必改项：替换为你的 Cloudflare Pages 函数地址，例如 https://utau.pages.dev/upload
+// 旧后端：文件写 GitHub 仓库 uploads/（50MB 硬顶）
 const API_ENDPOINT = "https://utau-4oo.pages.dev/upload";
+// D1 分片存储池（与旧仓库并存，可在下方单选切换）
+const SHARD_API = "https://utau-catbox-test.pages.dev/api/shards";
+const HOME_TAG = "home";            // 公共标签：主站全部 D1 文件都挂它，用于全量列表
+const SHARD_CHUNK = 900 * 1024;    // 单片 900KiB（D1 单行 BLOB 1MB 硬顶）
 
 const fileInput = document.getElementById("fileIn");
 const pickBtn = document.getElementById("pickBtn");
@@ -68,9 +78,18 @@ const dropArea = document.getElementById("drop");
 const uploadBtn = document.getElementById("uploadBtn");
 const agreeCheck = document.getElementById("agree");
 const msgBox = document.getElementById("msg");
+const storePick = document.getElementsByName("store");
 
-const MAX_SIZE = 50 * 1024 * 1024; // 与后端 functions/upload.js 的 MAX_RAW_SIZE 保持一致
+// 旧 GitHub 后端 50MB；D1 分片前端放宽到 500MB（受免费 D1 写额度约束，建议别再大）
+const MAX_SIZE_OLD = 50 * 1024 * 1024;
+const MAX_SIZE_SHARD = 500 * 1024 * 1024;
 const allowExt = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
+
+// 当前选中的存储后端：old = GitHub 仓库，d1 = D1 分片池
+function currentStore() {
+  const sel = document.querySelector('input[name="store"]:checked');
+  return sel ? sel.value : "old";
+}
 
 let selectedFiles = [];
 
@@ -89,15 +108,20 @@ dropArea.ondrop = (e) => {
 };
 fileInput.onchange = () => { if (fileInput.files.length > 0) selectFiles(fileInput.files); };
 
+function sizeLimit() {
+  return currentStore() === "d1" ? MAX_SIZE_SHARD : MAX_SIZE_OLD;
+}
+
 function selectFiles(fileList) {
   selectedFiles = [];
   const rejected = [];
+  const limit = sizeLimit();
   for (const file of fileList) {
     const ext = file.name.split(".").pop().toLowerCase();
     if (!allowExt.includes(ext)) {
       rejected.push(file.name + "（类型不允许）");
-    } else if (file.size > MAX_SIZE) {
-      rejected.push(file.name + "（超过 " + Math.round(MAX_SIZE / 1024 / 1024) + " MB）");
+    } else if (file.size > limit) {
+      rejected.push(file.name + "（超过 " + Math.round(limit / 1024 / 1024) + " MB）");
     } else {
       selectedFiles.push(file);
     }
@@ -138,6 +162,13 @@ function refreshState() {
   });
 }
 agreeCheck.onchange = refreshState;
+// 切换存储后端：按新上限重新校验已选文件
+storePick.forEach((r) => {
+  r.onchange = () => {
+    if (fileInput.files && fileInput.files.length > 0) selectFiles(fileInput.files);
+    refreshState();
+  };
+});
 
 /* ---------- 上传 ---------- */
 function arrayBufferToBase64(buffer) {
@@ -151,31 +182,82 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+async function sha256Hex(buf) {
+  const h = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function shardPost(path, body) {
+  const r = await fetch(SHARD_API + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+// D1 分片上传单文件：init → 逐片 chunk → finalize，返回 fileId
+async function uploadToShard(file, onProgress) {
+  const chunkCount = Math.max(1, Math.ceil(file.size / SHARD_CHUNK));
+  const init = await shardPost("/init", {
+    name: file.name,
+    mime: file.type || "application/octet-stream",
+    totalSize: file.size,
+    chunkCount,
+    tags: [HOME_TAG],
+    uploader: "web",
+  });
+  if (!init.ok) throw new Error(init.msg || "初始化失败");
+  const fileId = init.fileId;
+
+  for (let i = 0; i < chunkCount; i++) {
+    const slice = file.slice(i * SHARD_CHUNK, Math.min((i + 1) * SHARD_CHUNK, file.size));
+    const buf = await slice.arrayBuffer();
+    const hash = await sha256Hex(buf);
+    const r = await shardPost("/chunk", { fileId, index: i, data: arrayBufferToBase64(buf), hash });
+    if (!r.ok) throw new Error("分片 " + i + " 失败：" + (r.msg || ""));
+    if (onProgress) onProgress(i + 1, chunkCount);
+  }
+
+  const fin = await shardPost("/finalize", { fileId });
+  if (!fin.ok) throw new Error(fin.msg || "对账失败");
+  return fileId;
+}
+
 uploadBtn.onclick = async () => {
   if (selectedFiles.length === 0 || !agreeCheck.checked) return;
   uploadBtn.disabled = true;
+  const store = currentStore();
   const total = selectedFiles.length;
   const succeeded = [];
   const failed = [];
   for (let i = 0; i < total; i++) {
     const file = selectedFiles[i];
-    setMsg("上传中… (" + (i + 1) + "/" + total + ")：" + file.name + "，请勿关闭页面", "");
     try {
-      const base64 = arrayBufferToBase64(await file.arrayBuffer());
-      const res = await fetch(API_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, data: base64 }),
-      });
-      let ret = null;
-      try { ret = await res.json(); } catch (e) { /* 非 JSON 响应 */ }
-      if (ret && ret.ok) {
-        succeeded.push(file.name);
+      if (store === "d1") {
+        // D1 分片：init → 逐片 → finalize
+        setMsg("D1 上传中… (" + (i + 1) + "/" + total + ")：" + file.name, "");
+        await uploadToShard(file, (done, cnt) => {
+          setMsg(`D1 上传中… ${file.name} 分片 ${done}/${cnt}`, "");
+        });
       } else {
-        failed.push(file.name + "（" + (ret && ret.msg ? ret.msg : "HTTP " + res.status) + "）");
+        // 旧 GitHub 仓库：整体 base64
+        setMsg("上传中… (" + (i + 1) + "/" + total + ")：" + file.name + "，请勿关闭页面", "");
+        const base64 = arrayBufferToBase64(await file.arrayBuffer());
+        const res = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, data: base64 }),
+        });
+        let ret = null;
+        try { ret = await res.json(); } catch (e) { /* 非 JSON 响应 */ }
+        if (!ret || !ret.ok) {
+          throw new Error(ret && ret.msg ? ret.msg : "HTTP " + res.status);
+        }
       }
+      succeeded.push(file.name);
     } catch (err) {
-      failed.push(file.name + "（网络错误：" + err.message + "）");
+      failed.push(file.name + "（" + err.message + "）");
     }
   }
   let msg = "完成：成功 " + succeeded.length + " 个";
@@ -187,19 +269,31 @@ uploadBtn.onclick = async () => {
   refreshState();
 };
 
-/* ---------- 文件列表 ---------- */
+/* ---------- 文件列表：合并旧 GitHub 仓库 + D1 分片池 ---------- */
 async function loadFileList() {
+  let oldFiles = [];
+  let shardFiles = [];
   try {
-    const res = await fetch(API_ENDPOINT + "?list=1");
-    const data = await res.json();
-    const files = (data && data.files) ? data.files : [];
-    renderList("list-ust", files, ["ust"]);
-    renderList("list-ustx", files, ["ustx"]);
-    renderList("list-vocaloid", files, ["vsq", "vsqx", "vpr", "pp2", "pp3"]);
-    renderList("list-ziprar", files, ["zip", "rar"]);
+    const [oldRes, shardRes] = await Promise.all([
+      fetch(API_ENDPOINT + "?list=1").then(r => r.json()).catch(() => ({ files: [] })),
+      fetch(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`).then(r => r.json()).catch(() => ({ files: [] })),
+    ]);
+    oldFiles = (oldRes && oldRes.files) ? oldRes.files : [];
+    // D1 文件统一成 {name, raw, download}，下载走分片流式组装
+    shardFiles = ((shardRes && shardRes.files) ? shardRes.files : []).map(f => ({
+      name: f.name,
+      raw: `${SHARD_API}/file?fileId=${f.fileId}`,
+      download: `${SHARD_API}/file?fileId=${f.fileId}`,
+      source: "d1",
+    }));
   } catch (err) {
-    setMsg("加载文件列表失败：" + err.message + "（请检查 API_ENDPOINT 配置）", "error");
+    setMsg("加载文件列表失败：" + err.message, "error");
   }
+  const files = [...oldFiles, ...shardFiles];
+  renderList("list-ust", files, ["ust"]);
+  renderList("list-ustx", files, ["ustx"]);
+  renderList("list-vocaloid", files, ["vsq", "vsqx", "vpr", "pp2", "pp3"]);
+  renderList("list-ziprar", files, ["zip", "rar"]);
   refreshState();
 }
 
