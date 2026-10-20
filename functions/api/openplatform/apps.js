@@ -7,12 +7,35 @@
  * 注意：Cloudflare Pages Functions 不支持跨文件相对导入，公共工具已内联。
  */
 
+const ALLOWED_ORIGINS = [
+  "https://songyuheng800.github.io",
+  "https://utau-4oo.pages.dev",
+  "https://utau-catbox-test.pages.dev",
+];
+
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+};
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Content-Type": "application/json",
+  ...SECURITY_HEADERS,
 };
+
+function originAllowed(request) {
+  const origin = request.headers.get("Origin") || "";
+  if (origin) return ALLOWED_ORIGINS.includes(origin);
+  const ref = request.headers.get("Referer") || "";
+  if (!ref) return false;
+  try { return ALLOWED_ORIGINS.includes(new URL(ref).origin); } catch (e) { return false; }
+}
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
@@ -102,6 +125,10 @@ export async function onRequest(context) {
 }
 
 async function handleRegister(request, env) {
+  // CSRF：跨站伪造的注册请求会被 Origin/Referer 白名单拦截
+  if (!originAllowed(request)) {
+    return json({ ok: false, msg: "非法来源，拒绝注册" }, 403);
+  }
   let body;
   try { body = await request.json(); } catch (e) {
     return json({ ok: false, msg: "请求体不是合法的 JSON" }, 400);
@@ -118,8 +145,15 @@ async function handleRegister(request, env) {
   if (desc.length > 200) {
     return json({ ok: false, msg: "应用描述最多 200 字" }, 400);
   }
-  if (!/^https:\/\/.+/.test(redirectUri) || redirectUri.length > REDIRECT_URI_MAX) {
-    return json({ ok: false, msg: "回调地址必须是 https:// 开头的完整 URL" }, 400);
+  // 回调地址必须是合法 https URL，禁止 userinfo（user:pass@host 钓鱼）与超长
+  let parsedUri = null;
+  try { parsedUri = new URL(redirectUri); } catch (e) { parsedUri = null; }
+  if (
+    !parsedUri || parsedUri.protocol !== "https:" ||
+    parsedUri.username || parsedUri.password ||
+    redirectUri.length > REDIRECT_URI_MAX
+  ) {
+    return json({ ok: false, msg: "回调地址必须是不含账号密码的 https:// 完整 URL" }, 400);
   }
   const scopes = rawScopes.filter((s) => VALID_SCOPES.includes(String(s)));
   if (scopes.length === 0) {

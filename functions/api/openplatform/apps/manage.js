@@ -5,12 +5,35 @@
  *     action = "revoke"  校验 client_secret 后吊销应用
  */
 
+const ALLOWED_ORIGINS = [
+  "https://songyuheng800.github.io",
+  "https://utau-4oo.pages.dev",
+  "https://utau-catbox-test.pages.dev",
+];
+
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+};
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Content-Type": "application/json",
+  ...SECURITY_HEADERS,
 };
+
+function originAllowed(request) {
+  const origin = request.headers.get("Origin") || "";
+  if (origin) return ALLOWED_ORIGINS.includes(origin);
+  const ref = request.headers.get("Referer") || "";
+  if (!ref) return false;
+  try { return ALLOWED_ORIGINS.includes(new URL(ref).origin); } catch (e) { return false; }
+}
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
@@ -42,6 +65,11 @@ export async function onRequest(context) {
 
   if (request.method === "OPTIONS") return corsPreflight();
   if (request.method !== "POST") return json({ ok: false, msg: "方法错误" }, 405);
+
+  // CSRF：跨站伪造的查询/吊销请求会被 Origin/Referer 白名单拦截
+  if (!originAllowed(request)) {
+    return json({ ok: false, msg: "非法来源，拒绝操作" }, 403);
+  }
 
   let body;
   try { body = await request.json(); } catch (e) {

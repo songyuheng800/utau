@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 安全：限制资源来源、禁止被嵌套（防点击劫持）、收紧 Referer -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://utau-catbox-test.pages.dev; frame-ancestors 'none'; base-uri 'self'">
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta name="Referrer-Policy" content="strict-origin-when-cross-origin">
 <title>服务器配置 - UTAU 开发者平台</title>
 <style>
   :root {
@@ -161,9 +165,19 @@
       </div>
     </div>
 
+    <!-- 管理员凭证（保存配置必须，防未授权写入与 CSRF） -->
+    <div class="card">
+      <div class="card-title">🔑 管理员凭证</div>
+      <div class="form-group">
+        <label>管理员令牌（ADMIN_CONFIG_TOKEN）</label>
+        <input type="password" id="cfg-admin-token" placeholder="保存配置时必填，仅本次提交使用，不保存到页面" autocomplete="off">
+        <div class="hint">由服务端环境变量 ADMIN_CONFIG_TOKEN 配置，错误或缺失将无法保存。</div>
+      </div>
+    </div>
+
     <!-- 操作按钮 -->
     <div class="btn-row">
-      <button class="btn btn-gold" onclick="saveConfig()">💾 保存配置</button>
+      <button class="btn btn-gold" id="saveBtn" onclick="saveConfig()">💾 保存配置</button>
       <button class="btn btn-outline" onclick="testConn()">🔌 测试连接</button>
       <button class="btn btn-outline" onclick="loadConfig()">🔄 重新加载</button>
     </div>
@@ -174,6 +188,7 @@
 
 <script>
 const API = "https://utau-catbox-test.pages.dev/api";
+let cfgNonce = ""; // GET 下发的一次性配置凭证（防 CSRF/重放）
 
 function showToast(msg, err) {
   const t = document.getElementById('toast');
@@ -187,6 +202,7 @@ async function loadConfig() {
     const r = await fetch(API + "/server-config");
     const d = await r.json();
     if (!d.ok) throw new Error(d.msg);
+    cfgNonce = d.nonce || "";
     const c = d.config;
     document.getElementById('cfg-env').value = c.env;
     document.getElementById('cfg-api-open').value = c.api_open_url;
@@ -208,24 +224,46 @@ async function loadConfig() {
 }
 
 async function saveConfig() {
+  const btn = document.getElementById('saveBtn');
+  const token = document.getElementById('cfg-admin-token').value.trim();
+  if (!token) return showToast('请先填写管理员令牌', true);
+  if (!cfgNonce) return showToast('配置凭证缺失，请点「重新加载」后再保存', true);
+
+  const apiOpen = document.getElementById('cfg-api-open').value.trim();
+  const apiAuth = document.getElementById('cfg-api-auth').value.trim();
+  const defRedirect = document.getElementById('cfg-redirect').value.trim();
+  // URL 类字段前端预检 http/https，避免无效请求
+  for (const [v, name] of [[apiOpen, '开放平台 API 地址'], [apiAuth, '登录服务 API 地址'], [defRedirect, '默认 redirect_uri']]) {
+    if (!/^https?:\/\//.test(v)) return showToast(name + ' 必须是 http/https 开头的完整地址', true);
+  }
+
   const body = {
     env: document.getElementById('cfg-env').value,
-    api_open_url: document.getElementById('cfg-api-open').value,
-    api_auth_url: document.getElementById('cfg-api-auth').value,
-    frontend_domain: document.getElementById('cfg-domain').value,
-    default_redirect: document.getElementById('cfg-redirect').value,
+    api_open_url: apiOpen,
+    api_auth_url: apiAuth,
+    frontend_domain: document.getElementById('cfg-domain').value.trim(),
+    default_redirect: defRedirect,
+    admin_token: token,
+    nonce: cfgNonce,
   };
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '保存中…';
   try {
     const r = await fetch(API + "/server-config", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify(body)
     });
     const d = await r.json();
-    if (d.ok) showToast('✓ 配置已保存到 KV，立即生效');
-    else showToast('保存失败: ' + d.msg, true);
+    if (d.ok) {
+      showToast('✓ 配置已保存到 KV，立即生效');
+      loadConfig(); // 重新拉取新 nonce
+    } else {
+      showToast('保存失败: ' + (d.msg || '未知错误'), true);
+    }
   } catch (e) {
     showToast('保存失败: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = old;
   }
 }
 

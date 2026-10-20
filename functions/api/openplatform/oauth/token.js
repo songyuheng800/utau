@@ -10,11 +10,20 @@
  * 存 OP_CODES（key "token:" / "refresh:"）。
  */
 
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
+};
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Content-Type": "application/json",
+  ...SECURITY_HEADERS,
 };
 
 function json(obj, status = 200) {
@@ -102,16 +111,15 @@ async function handleCodeGrant(body, app, env) {
   }
 
   const raw = await kvGet(env, "code:" + code);
-  if (!raw) return json({ ok: false, msg: "授权码无效或已过期" }, 400);
+  if (!raw) return json({ ok: false, msg: "授权码无效、已过期或已被使用" }, 400);
   let grant;
   try { grant = JSON.parse(raw); } catch (e) { return json({ ok: false, msg: "授权码数据损坏" }, 500); }
 
-  if (grant.used) return json({ ok: false, msg: "授权码已被使用（一次性）" }, 400);
   if (grant.client_id !== app.client_id) return json({ ok: false, msg: "授权码与应用不匹配" }, 400);
 
-  // 标记已使用并删除
-  grant.used = true;
-  await kvPut(env, "code:" + code, grant, 60);
+  // TOCTOU 缓解：校验通过后【先一次性销毁授权码，再签发令牌】，
+  // 使并发的第二次兑换读不到该码，压缩检查→使用之间的重放窗口。
+  // （KV 无原子 CAS，彻底串行需 Durable Object，见加固说明）
   await kvDelete(env, "code:" + code);
 
   const accessToken = randomHex(32);
@@ -156,7 +164,7 @@ async function handleRefresh(body, app, env) {
 
   if (refresh.client_id !== app.client_id) return json({ ok: false, msg: "refresh_token 与应用不匹配" }, 400);
 
-  // 轮换：旧 refresh 作废
+  // TOCTOU 缓解：先销毁旧 refresh_token 再签发新对，压缩并发重放窗口（轮换即作废）
   await kvDelete(env, "refresh:" + refreshToken);
 
   const accessToken = randomHex(32);

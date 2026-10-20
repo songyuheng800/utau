@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 安全：禁止被嵌套(防点击劫持)、收紧 Referer、限制 base 跳转 -->
+<meta http-equiv="Content-Security-Policy" content="frame-ancestors 'none'; base-uri 'self'">
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta name="Referrer-Policy" content="strict-origin-when-cross-origin">
 <title>管理站 Token 获取 - UTAU 配布站</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23333'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3ET%3C/text%3E%3C/svg%3E">
 <style>

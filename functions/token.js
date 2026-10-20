@@ -25,12 +25,37 @@ const TOKEN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const TOKEN_LEN = 13;
 const DEFAULT_TTL = 7 * 24 * 60 * 60; // 7 天
 
+// 允许发起 Token 签发/校验的前端来源
+const ALLOWED_ORIGINS = [
+  "https://songyuheng800.github.io",
+  "https://utau-4oo.pages.dev",
+  "https://utau-catbox-test.pages.dev",
+];
+
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+};
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
   "Content-Type": "application/json",
+  ...SECURITY_HEADERS,
 };
+
+// 写操作 CSRF 校验：Origin 命中白名单，缺失时回退 Referer 同源校验
+function originAllowed(request) {
+  const origin = request.headers.get("Origin") || "";
+  if (origin) return ALLOWED_ORIGINS.includes(origin);
+  const ref = request.headers.get("Referer") || "";
+  if (!ref) return false;
+  try { return ALLOWED_ORIGINS.includes(new URL(ref).origin); } catch (e) { return false; }
+}
 
 // 内存降级存储（无 KV 绑定时使用；多实例间不共享，重启即失效）
 const memoryStore = new Map();
@@ -102,6 +127,11 @@ export async function onRequest(context) {
 
 /* ---------- 签发 Token ---------- */
 async function handleIssue(request, env) {
+  // CSRF：跨站伪造的签发请求会被 Origin/Referer 白名单拦截
+  if (!originAllowed(request)) {
+    return json({ ok: false, msg: "非法来源，拒绝签发" }, 403);
+  }
+
   let body;
   try {
     body = await request.json();
@@ -110,8 +140,10 @@ async function handleIssue(request, env) {
   }
 
   const pwd = String(body.password || "");
+  if (pwd.length > 128) return json({ ok: false, msg: "密码长度超出限制" }, 400);
   const ADMIN_PWD = env.ADMIN_PASSWORD || "233677";
-  if (pwd !== ADMIN_PWD) {
+  // 恒定时间比较，避免计时侧信道
+  if (!timingSafeEqual(pwd, ADMIN_PWD)) {
     return json({ ok: false, msg: "密码错误" }, 403);
   }
 
@@ -120,6 +152,15 @@ async function handleIssue(request, env) {
   const storage = await tokenStorePut(env, token, ttl);
 
   return json({ ok: true, token, ttl, storage });
+}
+
+/* ---------- 恒定时间字符串比较，避免计时侧信道 ---------- */
+function timingSafeEqual(a, b) {
+  const x = String(a), y = String(b);
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
 }
 
 /* ---------- 校验 Token ---------- */

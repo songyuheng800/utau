@@ -25,6 +25,10 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
   "Content-Type": "application/json",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 };
 
 export async function onRequest(context) {
@@ -92,10 +96,18 @@ async function handleUpload(request, kv) {
     return json({ ok: false, msg: "连接猫盒失败：" + e.message }, 502);
   }
   const text = await resp.text();
-  if (!resp.ok || !/^https?:\/\/\S+$/.test(text.trim())) {
+  if (!resp.ok) {
     return json({ ok: false, msg: "猫盒上传失败（HTTP " + resp.status + "）: " + text.slice(0, 200) }, 502);
   }
-  const url = text.trim();
+  // 校验返回链接必须是 catbox.moe 的 https 地址，拒绝异常/钓鱼地址落库展示
+  let url = "";
+  try {
+    const u = new URL(text.trim());
+    if (u.protocol !== "https:" || u.hostname !== "catbox.moe") throw new Error("bad url");
+    url = u.toString();
+  } catch (e) {
+    return json({ ok: false, msg: "猫盒返回地址非法" }, 502);
+  }
 
   // 记录到 KV 列表（新的在前）
   const ts = new Date().toISOString();

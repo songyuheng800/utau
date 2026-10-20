@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 安全：限制资源来源、禁止被嵌套（防点击劫持）、收紧 Referer -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://utau-catbox-test.pages.dev https://utau-4oo.pages.dev; frame-ancestors 'none'; base-uri 'self'">
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta name="Referrer-Policy" content="strict-origin-when-cross-origin">
 <title>UTAU 配布站 · 登录</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231d1d1f'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23f5c542' font-family='Arial' font-weight='900'%3EU%3C/text%3E%3C/svg%3E">
 <style>
@@ -165,27 +169,34 @@
 
   // 按钮已写死在 HTML 里，不再动态渲染
 
-  // 密码登录 / 注册
-  async function pwdReq(path, body) {
-    const r = await fetch(API + path, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (d.ok) {
-      showMsg("ok", d.msg);
-      setTimeout(() => location.reload(), 600);
-    } else {
-      showMsg("err", d.msg || "操作失败");
+  // 密码登录 / 注册（POST 由后端 Origin 白名单校验防 CSRF；按钮期间禁用防重复提交）
+  async function pwdReq(path, body, btn) {
+    if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = "处理中…"; }
+    try {
+      const r = await fetch(API + path, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d.ok) {
+        showMsg("ok", d.msg);
+        setTimeout(() => location.reload(), 600);
+      } else {
+        showMsg("err", d.msg || "操作失败");
+      }
+      return d;
+    } catch (e) {
+      showMsg("err", "网络错误，请稍后重试");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || btn.textContent; }
     }
-    return d;
   }
   $("pwdLoginBtn").addEventListener("click", () => {
     const u = $("pwdUser").value.trim(), pw = $("pwdPass").value;
     if (!u || !pw) return showMsg("err", "请填写用户名和密码");
-    pwdReq("/auth/login", { username: u, password: pw });
+    pwdReq("/auth/login", { username: u, password: pw }, $("pwdLoginBtn"));
   });
   $("pwdRegBtn").addEventListener("click", () => {
     const u = $("pwdUser").value.trim(), pw = $("pwdPass").value;
@@ -212,7 +223,7 @@
     for (const re of PATTERNS) {
       if (re.test(u)) return showMsg("err", "用户名包含不文明词汇，请换一个");
     }
-    pwdReq("/auth/register", { username: u, password: pw });
+    pwdReq("/auth/register", { username: u, password: pw }, $("pwdRegBtn"));
   });
   $("pwdPass").addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("pwdLoginBtn").click();
@@ -225,7 +236,9 @@
       if (d && d.logged_in && d.user) {
         $("viewGuest").classList.add("hidden");
         $("viewUser").classList.remove("hidden");
-        $("uAvatar").src = d.user.avatar || "";
+        // 头像仅允许 http/https，过滤 data:/javascript: 等异常协议
+        const av = String(d.user.avatar || "");
+        $("uAvatar").src = /^https?:\/\//.test(av) ? av : "";
         $("uName").textContent = d.user.name || d.user.username || d.user.gh_login || d.user.email || "—";
         const loginId = d.user.email || (d.user.gh_login ? "@" + d.user.gh_login : "") || (d.user.username ? "@" + d.user.username : "");
         $("uLogin").textContent = loginId;
@@ -260,8 +273,19 @@
     }
   });
 
-  $("logoutBtn").addEventListener("click", () => {
-    location.href = API + "/oauth/logout";
+  // 退出登录改用 POST（GET 链接可被跨站页面强制触发登出，即 logout CSRF）
+  $("logoutBtn").addEventListener("click", async () => {
+    const btn = $("logoutBtn");
+    btn.disabled = true; btn.textContent = "退出中…";
+    try {
+      await fetch(API + "/oauth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Accept": "application/json" },
+      });
+    } catch (e) { /* 忽略网络错误，直接跳转 */ }
+    location.href = "?logout=1";
+    setTimeout(() => location.reload(), 300);
   });
 })();
 </script>
