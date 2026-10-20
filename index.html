@@ -47,7 +47,7 @@
 </div>
 
 <div class="agree-box" style="font-size:14px">
-  存储位置：D1 分片存储（≤500MB，浏览器直传文件流，不转 base64）
+  存储：小文件（≤20MB）存入 GitHub 独立仓 utau-files；大文件（&gt;20MB）走 D1 二进制直传，均提供直链下载。旧仓保留共存。
 </div>
 
 <div class="agree-box">
@@ -83,7 +83,23 @@ const storePick = document.getElementsByName("store");
 
 // D1 分片前端上限 500MB（受免费 D1 写额度约束，建议别再大）
 const MAX_SIZE_SHARD = 500 * 1024 * 1024;
+// 小文件阈值：≤20MB 走 GitHub 独立仓（multipart 二进制提交，服务端落盘），>20MB 走 D1 直传
+const GITHUB_MAX = 20 * 1024 * 1024;
 const allowExt = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
+
+// 小文件 → GitHub 独立仓：FormData 二进制直传，前端不转 base64
+async function uploadToGithub(file, onProgress) {
+  const fd = new FormData();
+  fd.append("filename", file.name);
+  fd.append("file", file, file.name);
+  const r = await retry(async () => {
+    const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
+    if (res.status >= 500) throw new Error("HTTP " + res.status);
+    return res.json().catch(() => ({ ok: false, msg: "响应解析失败" }));
+  });
+  if (!r.ok) throw new Error(r.msg || "GitHub 上传失败");
+  if (onProgress) onProgress(1, 1);
+}
 
 let selectedFiles = [];
 
@@ -235,11 +251,17 @@ uploadBtn.onclick = async () => {
   for (let i = 0; i < total; i++) {
     const file = selectedFiles[i];
     try {
-      // D1 分片：init → 逐片二进制直传 → finalize，不转 base64
-      setMsg(`D1 上传中… (${i + 1}/${total})：${file.name}`, "");
-      await uploadToShard(file, (done, cnt) => {
-        setMsg(`D1 上传中… ${file.name} 分片 ${done}/${cnt}`, "");
-      });
+      if (file.size <= GITHUB_MAX) {
+        // 小文件 → GitHub 独立仓（multipart 二进制提交）
+        setMsg(`GitHub 上传中… (${i + 1}/${total})：${file.name}`, "");
+        await uploadToGithub(file);
+      } else {
+        // 大文件 → D1 分片：init → 逐片二进制直传 → finalize
+        setMsg(`D1 上传中… (${i + 1}/${total})：${file.name}`, "");
+        await uploadToShard(file, (done, cnt) => {
+          setMsg(`D1 上传中… ${file.name} 分片 ${done}/${cnt}`, "");
+        });
+      }
       succeeded.push(file.name);
     } catch (err) {
       failed.push(file.name + "（" + err.message + "）");
@@ -267,10 +289,16 @@ async function loadFileList() {
       return r.json();
     });
   } catch (e) { /* 重试耗尽后保留空，不覆盖已有渲染 */ }
-  // 旧 GitHub 通道只读兜底，失败静默
-  let oldRes = { files: [] };
-  try { oldRes = await fetch(API_ENDPOINT + "?list=1").then(r => r.json()).catch(() => ({ files: [] })); } catch (e) {}
-  oldFiles = (oldRes && oldRes.files) ? oldRes.files : [];
+  // GitHub 独立仓（小文件）：网络抖动/5xx 自动重试，失败静默保留空
+  let ghRes = { files: [] };
+  try {
+    ghRes = await retry(async () => {
+      const r = await fetch(API_ENDPOINT + "?list=1");
+      if (r.status >= 500) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  } catch (e) {}
+  oldFiles = ((ghRes && ghRes.files) ? ghRes.files : []).map(f => ({ ...f, source: "github" }));
   // D1 文件统一成 {name, raw, download}，下载走分片流式组装
   shardFiles = ((shardRes && shardRes.files) ? shardRes.files : []).map(f => ({
     name: f.name,
@@ -278,7 +306,7 @@ async function loadFileList() {
     download: `${SHARD_API}/file?fileId=${f.fileId}`,
     source: "d1",
   }));
-  // 按文件名去重：同名优先显示 D1 版本（已迁移），旧 GitHub 副本不重复列出
+  // 按文件名去重：同名优先 D1，GitHub 副本不重复列出
   const byName = new Map();
   for (const f of oldFiles) byName.set(f.name, f);
   for (const f of shardFiles) byName.set(f.name, f);

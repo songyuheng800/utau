@@ -114,28 +114,47 @@ async function handleList(requestUrl, token, user, repo) {
   return json({ ok: true, files });
 }
 
-/* ---------- 上传 ---------- */
+/* ---------- 上传 ----------
+ * 优先接收 multipart/form-data（浏览器二进制直传：字段 filename + file Blob），
+ * 服务端再转 base64 写 GitHub（Contents API 强制 base64，前端不转、不全量膨胀）。
+ * 兼容旧的 JSON {filename,data:base64}。
+ */
 async function handleUpload(request, token, user, repo) {
-  let body;
-  try {
-    body = await request.json();
-  } catch (e) {
-    return json({ ok: false, msg: "请求体不是合法的 JSON" }, 400);
-  }
+  let rawName = "";
+  let data = "";
 
-  const rawName = typeof body.filename === "string" ? body.filename : "";
-  const data = typeof body.data === "string" ? body.data : "";
+  const ct = request.headers.get("content-type") || "";
+  if (ct.includes("multipart/form-data")) {
+    let form;
+    try { form = await request.formData(); }
+    catch (e) { return json({ ok: false, msg: " multipart 解析失败" }, 400); }
+    rawName = String(form.get("filename") || "");
+    const part = form.get("file");
+    if (!part || typeof part.arrayBuffer !== "function") {
+      return json({ ok: false, msg: "缺少文件字段 file" }, 400);
+    }
+    const buf = new Uint8Array(await part.arrayBuffer());
+    if (buf.length === 0) return json({ ok: false, msg: "文件为空" }, 400);
+    if (buf.length > MAX_RAW_SIZE) {
+      return json({ ok: false, msg: "文件过大，上限 " + Math.floor(MAX_RAW_SIZE / 1024 / 1024) + " MB" }, 413);
+    }
+    data = uint8ToBase64(buf);
+  } else {
+    let body;
+    try { body = await request.json(); }
+    catch (e) { return json({ ok: false, msg: "请求体不是合法的 JSON" }, 400); }
+    rawName = typeof body.filename === "string" ? body.filename : "";
+    data = typeof body.data === "string" ? body.data : "";
+    const rawSize = Math.floor(data.length * 3 / 4);
+    if (rawSize > MAX_RAW_SIZE) {
+      return json({ ok: false, msg: "文件过大，上限 " + Math.floor(MAX_RAW_SIZE / 1024 / 1024) + " MB" }, 413);
+    }
+  }
 
   // 服务端再次校验扩展名（不信任前端）
   const ext = rawName.split(".").pop().toLowerCase();
   if (!ALLOWED_EXT.includes(ext)) {
     return json({ ok: false, msg: "不允许的文件类型：" + (ext || "(无扩展名)") }, 400);
-  }
-
-  // base64 长度换算原始大小做上限检查（base64 约膨胀 4/3）
-  const rawSize = Math.floor(data.length * 3 / 4);
-  if (rawSize > MAX_RAW_SIZE) {
-    return json({ ok: false, msg: "文件过大，上限 " + Math.floor(MAX_RAW_SIZE / 1024 / 1024) + " MB" }, 413);
   }
 
   // 服务端加时间戳，保证同名文件不会互相覆盖（每次都是新文件）
@@ -168,6 +187,16 @@ async function handleUpload(request, token, user, repo) {
   }
   const ghMsg = result.message || result.errors || "GitHub 写入失败";
   return json({ ok: false, msg: String(ghMsg) }, 502);
+}
+
+// Uint8Array → base64（分块拼接，避免调用栈溢出）
+function uint8ToBase64(bytes) {
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }
 
 /* ---------- 代理下载：强制浏览器保存文件 ---------- */
