@@ -258,22 +258,26 @@ uploadBtn.onclick = async () => {
 async function loadFileList() {
   let oldFiles = [];
   let shardFiles = [];
+  // D1 是主源：网络抖动/5xx 自动重试，避免偶发 503 导致列表看起来全空
+  let shardRes = { files: [] };
   try {
-    const [oldRes, shardRes] = await Promise.all([
-      fetch(API_ENDPOINT + "?list=1").then(r => r.json()).catch(() => ({ files: [] })),
-      fetch(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`).then(r => r.json()).catch(() => ({ files: [] })),
-    ]);
-    oldFiles = (oldRes && oldRes.files) ? oldRes.files : [];
-    // D1 文件统一成 {name, raw, download}，下载走分片流式组装
-    shardFiles = ((shardRes && shardRes.files) ? shardRes.files : []).map(f => ({
-      name: f.name,
-      raw: `${SHARD_API}/file?fileId=${f.fileId}`,
-      download: `${SHARD_API}/file?fileId=${f.fileId}`,
-      source: "d1",
-    }));
-  } catch (err) {
-    setMsg("加载文件列表失败：" + err.message, "error");
-  }
+    shardRes = await retry(async () => {
+      const r = await fetch(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`);
+      if (r.status >= 500) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  } catch (e) { /* 重试耗尽后保留空，不覆盖已有渲染 */ }
+  // 旧 GitHub 通道只读兜底，失败静默
+  let oldRes = { files: [] };
+  try { oldRes = await fetch(API_ENDPOINT + "?list=1").then(r => r.json()).catch(() => ({ files: [] })); } catch (e) {}
+  oldFiles = (oldRes && oldRes.files) ? oldRes.files : [];
+  // D1 文件统一成 {name, raw, download}，下载走分片流式组装
+  shardFiles = ((shardRes && shardRes.files) ? shardRes.files : []).map(f => ({
+    name: f.name,
+    raw: `${SHARD_API}/file?fileId=${f.fileId}`,
+    download: `${SHARD_API}/file?fileId=${f.fileId}`,
+    source: "d1",
+  }));
   // 按文件名去重：同名优先显示 D1 版本（已迁移），旧 GitHub 副本不重复列出
   const byName = new Map();
   for (const f of oldFiles) byName.set(f.name, f);
