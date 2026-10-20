@@ -211,10 +211,14 @@ async function uploadToShard(file, onProgress) {
   const fileId = init.fileId;
 
   for (let i = 0; i < chunkCount; i++) {
+    // 二进制直传：直接把切片 Blob 放进 FormData，不读成 base64、不全量进内存
     const slice = file.slice(i * SHARD_CHUNK, Math.min((i + 1) * SHARD_CHUNK, file.size));
-    const buf = await slice.arrayBuffer();
-    const hash = await sha256Hex(buf);
-    const r = await shardPost("/chunk", { fileId, index: i, data: arrayBufferToBase64(buf), hash });
+    const fd = new FormData();
+    fd.append("fileId", fileId);
+    fd.append("index", String(i));
+    fd.append("file", slice, `part-${i}`);
+    const res = await fetch(SHARD_API + "/chunk", { method: "POST", body: fd });
+    const r = await res.json().catch(() => ({ ok: false, msg: "响应解析失败" }));
     if (!r.ok) throw new Error("分片 " + i + " 失败：" + (r.msg || ""));
     if (onProgress) onProgress(i + 1, chunkCount);
   }
