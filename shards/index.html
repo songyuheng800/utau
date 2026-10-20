@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://utau-catbox-test.pages.dev; frame-ancestors 'none'">
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta name="Referrer-Policy" content="strict-origin-when-cross-origin">
+<title>分片存储测试 · UTAU</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#14161a;color:#e8e8e8;max-width:820px;margin:0 auto;padding:24px;line-height:1.6}
+  h1{font-size:22px} .card{background:#1e2128;border:1px solid #2c313a;border-radius:10px;padding:18px;margin:14px 0}
+  input,button{font:inherit} input[type=text]{width:100%;padding:8px 10px;border-radius:6px;border:1px solid #3a4048;background:#14161a;color:#eee;box-sizing:border-box}
+  button{background:#0066cc;color:#fff;border:0;border-radius:6px;padding:8px 16px;cursor:pointer} button:disabled{opacity:.5}
+  .muted{color:#9aa3ad;font-size:13px} .prog{height:8px;background:#2c313a;border-radius:6px;overflow:hidden;margin:8px 0}
+  .prog>i{display:block;height:100%;width:0;background:#37b24d;transition:width .2s}
+  .item{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #2c313a;align-items:center}
+  .err{color:#ff8787} .ok{color:#8ce99a} a{color:#74c0fc}
+</style>
+</head>
+<body>
+<h1>分片存储（D1 池 + KV 索引）测试</h1>
+
+<div class="card">
+  <div class="muted">前端按 900KB 切片 → init → 逐片上传 → finalize 转正；下载由后端流式组装。</div>
+  <p><input type="file" id="file"></p>
+  <p>标签（逗号分隔）：<input type="text" id="tags" placeholder="utau, 音源, 中文"></p>
+  <p><button id="upBtn">上传</button> <span id="status" class="muted"></span></p>
+  <div class="prog"><i id="bar"></i></div>
+</div>
+
+<div class="card">
+  <p>按标签查看：<input type="text" id="qtag" placeholder="utau"> <button id="listBtn">查询</button></p>
+  <div id="list"></div>
+</div>
+
+<script>
+const API = "https://utau-catbox-test.pages.dev/api/shards";
+const CHUNK = 900 * 1024;
+
+const $ = (id) => document.getElementById(id);
+function setStatus(t, cls){ const el=$("status"); el.textContent=t; el.className=cls||"muted"; }
+function bufToB64(buf){ const u8=new Uint8Array(buf); let s=""; for(let i=0;i<u8.length;i+=0x8000){ s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); } return btoa(s); }
+async function sha256(buf){ const h=await crypto.subtle.digest("SHA-256",buf); return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join(""); }
+
+async function post(path, body){
+  const r = await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(body)});
+  return r.json();
+}
+
+$("upBtn").onclick = async () => {
+  const file = $("file").files[0];
+  if(!file) return setStatus("先选文件","err");
+  const tags = $("tags").value.split(",").map(s=>s.trim()).filter(Boolean);
+  $("upBtn").disabled = true;
+  try{
+    const chunkCount = Math.ceil(file.size / CHUNK);
+    setStatus("初始化…");
+    const init = await post("/init",{name:file.name,mime:file.type||"application/octet-stream",totalSize:file.size,chunkCount,tags,uploader:"web"});
+    if(!init.ok) throw new Error(init.msg);
+    const fileId = init.fileId;
+
+    for(let i=0;i<chunkCount;i++){
+      const slice = file.slice(i*CHUNK,(i+1)*CHUNK);
+      const buf = await slice.arrayBuffer();
+      const hash = await sha256(buf);
+      const r = await post("/chunk",{fileId,index:i,data:bufToB64(buf),hash});
+      if(!r.ok) throw new Error("分片 "+i+" 失败："+r.msg);
+      $("bar").style.width = Math.round(((i+1)/chunkCount)*100)+"%";
+      setStatus(`上传分片 ${i+1}/${chunkCount}`);
+    }
+
+    setStatus("对账转正…");
+    const fin = await post("/finalize",{fileId});
+    if(!fin.ok) throw new Error(fin.msg);
+    setStatus("✓ 完成 fileId="+fileId,"ok");
+  }catch(e){ setStatus("✗ "+e.message,"err"); }
+  finally{ $("upBtn").disabled=false; }
+};
+
+$("listBtn").onclick = async () => {
+  const tag = $("qtag").value.trim();
+  const r = await fetch(`${API}/list?tag=${encodeURIComponent(tag)}`);
+  const d = await r.json();
+  const box = $("list"); box.textContent="";
+  if(!d.ok){ const p=document.createElement("div"); p.className="err"; p.textContent=d.msg; box.appendChild(p); return; }
+  d.files.forEach(f=>{
+    const row=document.createElement("div"); row.className="item";
+    const left=document.createElement("div");
+    const nm=document.createElement("div"); nm.textContent=f.name;
+    const meta=document.createElement("div"); meta.className="muted";
+    meta.textContent=`${(f.totalSize/1024/1024).toFixed(2)} MB · ${(f.tags||[]).join(", ")} · ${f.fileId}`;
+    left.appendChild(nm); left.appendChild(meta);
+    const right=document.createElement("div");
+    const dl=document.createElement("a"); dl.href=`${API}/file?fileId=${f.fileId}`; dl.textContent="下载";
+    const del=document.createElement("button"); del.textContent="删除"; del.style.marginLeft="8px";
+    del.onclick=async()=>{
+      const res=await fetch(`${API}/file?fileId=${f.fileId}`,{method:"DELETE"});
+      const j=await res.json(); setStatus(j.msg||"", j.ok?"ok":"err"); $("listBtn").click();
+    };
+    right.appendChild(dl); right.appendChild(del);
+    row.appendChild(left); row.appendChild(right);
+    box.appendChild(row);
+  });
+  if(!d.files.length) box.textContent="（无）";
+};
+</script>
+</body>
+</html>
