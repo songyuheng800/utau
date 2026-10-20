@@ -37,8 +37,8 @@ const CORS_HEADERS = {
 export async function onRequest(context) {
   const { request, env } = context;
   const { GH_TOKEN, GH_USER } = env;
-  // 文件统一写入独立新仓 FILES_REPO；旧仓 GH_REPO 仅用于日志，保留共存不删
-  const GH_REPO = env.GH_REPO || FILES_REPO;
+  // 主仓=独立新仓 FILES_REPO；兜底仓=旧仓 env.GH_REPO（令牌已授权），授权未就绪时回退写入，旧仓保留共存
+  const FALLBACK_REPO = env.GH_REPO || "";
 
   if (!GH_TOKEN || !GH_USER) {
     return json({ ok: false, msg: "后端环境变量未配置（GH_TOKEN / GH_USER）" }, 500);
@@ -55,11 +55,11 @@ export async function onRequest(context) {
     if (url.searchParams.has("stats")) {
       return handleStats(request, url.searchParams.get("stats"), env);
     }
-    // ?download=文件名 → 代理下载，强制浏览器保存（新仓）
+    // ?download=文件名 → 代理下载，强制保存；先找新仓，回退旧仓
     if (url.searchParams.has("download")) {
-      return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, FILES_REPO, request, env);
+      return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, request, env, [FILES_REPO, FALLBACK_REPO].filter(Boolean));
     }
-    return handleList(url, GH_TOKEN, GH_USER, FILES_REPO);
+    return handleList(url, GH_TOKEN, GH_USER, [FILES_REPO, FALLBACK_REPO].filter(Boolean));
   }
 
   if (request.method === "POST") {
@@ -68,11 +68,11 @@ export async function onRequest(context) {
     if (url.searchParams.get("track") === "1") {
       return handleTrack(request, env, "pageview");
     }
-    return handleUpload(request, GH_TOKEN, GH_USER, FILES_REPO);
+    return handleUpload(request, GH_TOKEN, GH_USER, [FILES_REPO, FALLBACK_REPO].filter(Boolean));
   }
 
   if (request.method === "DELETE") {
-    return handleDelete(request, GH_TOKEN, GH_USER, FILES_REPO, env);
+    return handleDelete(request, GH_TOKEN, GH_USER, env, [FILES_REPO, FALLBACK_REPO].filter(Boolean));
   }
 
   return json({ ok: false, msg: "方法错误" }, 405);
@@ -82,35 +82,35 @@ function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: CORS_HEADERS });
 }
 
-/* ---------- 文件列表 ---------- */
-async function handleList(requestUrl, token, user, repo) {
-  const apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/uploads`, {
-    headers: {
-      Authorization: `token ${token}`,
-      "User-Agent": "utau-sharing-proxy",
-      Accept: "application/vnd.github+json",
-    },
-  });
-
-  // uploads/ 目录还不存在，返回空列表而不是报错
-  if (apiRes.status === 404) {
-    return json({ ok: true, files: [] });
+/* ---------- 文件列表：遍历主仓(新)与兜底仓(旧)合并，同名新仓优先 ---------- */
+async function handleList(requestUrl, token, user, repos) {
+  const byName = new Map();
+  for (const repo of repos) {
+    let apiRes;
+    try {
+      apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/uploads`, {
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "utau-sharing-proxy",
+          Accept: "application/vnd.github+json",
+        },
+      });
+    } catch (e) { continue; }
+    if (!apiRes.ok) continue;
+    let list;
+    try { list = await apiRes.json(); } catch (e) { continue; }
+    if (!Array.isArray(list)) continue;
+    for (const x of list.filter((f) => f.type === "file")) {
+      if (byName.has(x.name)) continue; // 同名先入为主：新仓优先，旧仓不覆盖
+      byName.set(x.name, {
+        name: x.name,
+        raw: `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(x.name)}`,
+        download: `${requestUrl.origin}/upload?download=${encodeURIComponent(x.name)}`,
+        repo,
+      });
+    }
   }
-  if (!apiRes.ok) {
-    return json({ ok: false, msg: "读取文件列表失败（GitHub API " + apiRes.status + "）" }, 502);
-  }
-
-  const list = await apiRes.json();
-  const files = list
-    .filter((x) => x.type === "file")
-    .map((x) => ({
-      name: x.name,
-      raw: `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(x.name)}`,
-      // 代理下载地址（同源，带 Content-Disposition: attachment，浏览器直接下载）
-      download: `${requestUrl.origin}/upload?download=${encodeURIComponent(x.name)}`,
-    }))
-    .sort((a, b) => b.name.localeCompare(a.name)); // 文件名带时间戳前缀，新的在前
-
+  const files = [...byName.values()].sort((a, b) => b.name.localeCompare(a.name));
   return json({ ok: true, files });
 }
 
@@ -119,7 +119,7 @@ async function handleList(requestUrl, token, user, repo) {
  * 服务端再转 base64 写 GitHub（Contents API 强制 base64，前端不转、不全量膨胀）。
  * 兼容旧的 JSON {filename,data:base64}。
  */
-async function handleUpload(request, token, user, repo) {
+async function handleUpload(request, token, user, repos) {
   let rawName = "";
   let data = "";
 
@@ -164,29 +164,35 @@ async function handleUpload(request, token, user, repo) {
     return json({ ok: false, msg: "文件名不合法" }, 400);
   }
 
-  const putUrl = `https://api.github.com/repos/${user}/${repo}/contents/uploads/${filename}`;
-  const resp = await fetch(putUrl, {
-    method: "PUT",
-    headers: {
-      Authorization: `token ${token}`,
-      "User-Agent": "utau-sharing-proxy",
-      Accept: "application/vnd.github+json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: `上传工程/声库文件: ${filename}`,
-      content: data,
-    }),
-  });
+  // 依次尝试各仓：主仓(新)授权失败/不可写时回退兜底仓(旧)，全部失败才报错
+  let lastErr = "GitHub 写入失败";
+  for (const repo of repos) {
+    const putUrl = `https://api.github.com/repos/${user}/${repo}/contents/uploads/${filename}`;
+    let resp, result = {};
+    try {
+      resp = await fetch(putUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "utau-sharing-proxy",
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: `上传工程/声库文件: ${filename}`,
+          content: data,
+        }),
+      });
+      try { result = await resp.json(); } catch (e) { /* 非 JSON */ }
+    } catch (e) { lastErr = "网络错误：" + e.message; continue; }
 
-  let result = {};
-  try { result = await resp.json(); } catch (e) { /* 非 JSON 响应 */ }
-
-  if (resp.ok) {
-    return json({ ok: true });
+    if (resp.ok) {
+      return json({ ok: true, repo });
+    }
+    lastErr = String(result.message || result.errors || ("GitHub HTTP " + resp.status));
+    // 403/404 授权类错误才回退下一仓；其余错误也继续尝试
   }
-  const ghMsg = result.message || result.errors || "GitHub 写入失败";
-  return json({ ok: false, msg: String(ghMsg) }, 502);
+  return json({ ok: false, msg: lastErr }, 502);
 }
 
 // Uint8Array → base64（分块拼接，避免调用栈溢出）
@@ -199,8 +205,8 @@ function uint8ToBase64(bytes) {
   return btoa(binary);
 }
 
-/* ---------- 代理下载：强制浏览器保存文件 ---------- */
-async function handleDownload(filename, token, user, repo, request, env) {
+/* ---------- 代理下载：强制浏览器保存文件，先找新仓再找旧仓 ---------- */
+async function handleDownload(filename, token, user, request, env, repos) {
   // 安全校验：只允许文件名（不能含路径穿越）
   const safeName = String(filename).split(/[\\/]/).pop();
   const ext = safeName.split(".").pop().toLowerCase();
@@ -208,27 +214,25 @@ async function handleDownload(filename, token, user, repo, request, env) {
     return new Response("不允许的文件类型", { status: 400 });
   }
 
-  // 记录下载日志
+  // 记录下载日志（写旧仓 logs.json）
   logEvent(env, { type: "download", file: safeName, request });
 
-  // 从 GitHub raw 取文件内容
-  const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(safeName)}`;
-  const resp = await fetch(rawUrl, {
-    headers: { "User-Agent": "utau-sharing-proxy" },
-  });
+  for (const repo of repos) {
+    const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(safeName)}`;
+    let resp;
+    try {
+      resp = await fetch(rawUrl, { headers: { "User-Agent": "utau-sharing-proxy" } });
+    } catch (e) { continue; }
+    if (!resp.ok) continue;
 
-  if (!resp.ok) {
-    return new Response("文件不存在", { status: 404 });
+    // Content-Disposition: attachment 让浏览器下载而不是显示
+    const headers = new Headers(resp.headers);
+    headers.set("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+    headers.set("Content-Type", "application/octet-stream");
+    headers.set("Access-Control-Allow-Origin", "*");
+    return new Response(resp.body, { status: 200, headers });
   }
-
-  // 关键：Content-Disposition: attachment 让浏览器下载而不是显示
-  const headers = new Headers(resp.headers);
-  headers.set("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}`);
-  headers.set("Content-Type", "application/octet-stream");
-  // 允许跨域（前端在 github.io）
-  headers.set("Access-Control-Allow-Origin", "*");
-
-  return new Response(resp.body, { status: 200, headers });
+  return new Response("文件不存在", { status: 404 });
 }
 
 /* ---------- 日志记录（写入 GitHub 仓库 logs.json） ---------- */
@@ -307,8 +311,8 @@ async function tokenIsValid(token, env) {
   }
 }
 
-/* ---------- 删除文件（管理后台，需密码或 Token） ---------- */
-async function handleDelete(request, token, user, repo, env) {
+/* ---------- 删除文件（管理后台，需密码或 Token）：遍历新仓/旧仓定位后删除 ---------- */
+async function handleDelete(request, token, user, env, repos) {
   // 管理密码：优先读环境变量 ADMIN_PASSWORD，默认 233677
   const ADMIN_PWD = env.ADMIN_PASSWORD || "233677";
 
@@ -329,34 +333,35 @@ async function handleDelete(request, token, user, repo, env) {
     return json({ ok: false, msg: "缺少文件名" }, 400);
   }
 
-  // 先查文件 SHA
-  const metaRes = await fetch(
-    `https://api.github.com/repos/${user}/${repo}/contents/uploads/${encodeURIComponent(filename)}`,
-    { headers: { Authorization: `token ${token}`, "User-Agent": "utau-sharing-proxy" } }
-  );
-  if (!metaRes.ok) {
-    return json({ ok: false, msg: "文件不存在" }, 404);
-  }
-  const meta = await metaRes.json();
+  for (const repo of repos) {
+    // 先查文件 SHA
+    let metaRes;
+    try {
+      metaRes = await fetch(
+        `https://api.github.com/repos/${user}/${repo}/contents/uploads/${encodeURIComponent(filename)}`,
+        { headers: { Authorization: `token ${token}`, "User-Agent": "utau-sharing-proxy" } }
+      );
+    } catch (e) { continue; }
+    if (!metaRes.ok) continue;
+    let meta;
+    try { meta = await metaRes.json(); } catch (e) { continue; }
 
-  // 删除
-  const delRes = await fetch(
-    `https://api.github.com/repos/${user}/${repo}/contents/uploads/${encodeURIComponent(filename)}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `token ${token}`,
-        "User-Agent": "utau-sharing-proxy",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ message: "删除文件: " + filename, sha: meta.sha }),
-    }
-  );
-
-  if (delRes.ok) {
-    return json({ ok: true });
+    const delRes = await fetch(
+      `https://api.github.com/repos/${user}/${repo}/contents/uploads/${encodeURIComponent(filename)}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "utau-sharing-proxy",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: "删除文件: " + filename, sha: meta.sha }),
+      }
+    );
+    if (delRes.ok) return json({ ok: true, repo });
+    return json({ ok: false, msg: "删除失败（GitHub " + delRes.status + "）" }, 502);
   }
-  return json({ ok: false, msg: "删除失败（GitHub " + delRes.status + "）" }, 502);
+  return json({ ok: false, msg: "文件不存在" }, 404);
 }
 
 /* 去掉路径部分、替换 GitHub 不允许的字符、限制长度 */
