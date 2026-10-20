@@ -44,9 +44,7 @@
 </div>
 
 <div class="agree-box" style="font-size:14px">
-  存储位置：
-  <label><input type="radio" name="store" value="d1" checked> D1 分片存储（≤500MB，默认，大文件推荐）</label>
-  <label style="margin-left:14px"><input type="radio" name="store" value="old"> GitHub 仓库（≤50MB）</label>
+  存储位置：D1 分片存储（≤500MB，浏览器直传文件流，不转 base64）
 </div>
 
 <div class="agree-box">
@@ -80,16 +78,9 @@ const agreeCheck = document.getElementById("agree");
 const msgBox = document.getElementById("msg");
 const storePick = document.getElementsByName("store");
 
-// 旧 GitHub 后端 50MB；D1 分片前端放宽到 500MB（受免费 D1 写额度约束，建议别再大）
-const MAX_SIZE_OLD = 50 * 1024 * 1024;
+// D1 分片前端上限 500MB（受免费 D1 写额度约束，建议别再大）
 const MAX_SIZE_SHARD = 500 * 1024 * 1024;
 const allowExt = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
-
-// 当前选中的存储后端：old = GitHub 仓库，d1 = D1 分片池
-function currentStore() {
-  const sel = document.querySelector('input[name="store"]:checked');
-  return sel ? sel.value : "old";
-}
 
 let selectedFiles = [];
 
@@ -109,7 +100,7 @@ dropArea.ondrop = (e) => {
 fileInput.onchange = () => { if (fileInput.files.length > 0) selectFiles(fileInput.files); };
 
 function sizeLimit() {
-  return currentStore() === "d1" ? MAX_SIZE_SHARD : MAX_SIZE_OLD;
+  return MAX_SIZE_SHARD;
 }
 
 function selectFiles(fileList) {
@@ -171,22 +162,6 @@ storePick.forEach((r) => {
 });
 
 /* ---------- 上传 ---------- */
-function arrayBufferToBase64(buffer) {
-  // 分块拼接，避免大文件用展开运算符打爆调用栈
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
-
-async function sha256Hex(buf) {
-  const h = await crypto.subtle.digest("SHA-256", buf);
-  return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 // 网络抖动/5xx 自动退避重试；业务错误(ok:false)不重试
 async function retry(fn, n = 3) {
   let lastErr;
@@ -251,34 +226,17 @@ async function uploadToShard(file, onProgress) {
 uploadBtn.onclick = async () => {
   if (selectedFiles.length === 0 || !agreeCheck.checked) return;
   uploadBtn.disabled = true;
-  const store = currentStore();
   const total = selectedFiles.length;
   const succeeded = [];
   const failed = [];
   for (let i = 0; i < total; i++) {
     const file = selectedFiles[i];
     try {
-      if (store === "d1") {
-        // D1 分片：init → 逐片 → finalize
-        setMsg("D1 上传中… (" + (i + 1) + "/" + total + ")：" + file.name, "");
-        await uploadToShard(file, (done, cnt) => {
-          setMsg(`D1 上传中… ${file.name} 分片 ${done}/${cnt}`, "");
-        });
-      } else {
-        // 旧 GitHub 仓库：整体 base64
-        setMsg("上传中… (" + (i + 1) + "/" + total + ")：" + file.name + "，请勿关闭页面", "");
-        const base64 = arrayBufferToBase64(await file.arrayBuffer());
-        const res = await fetch(API_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: file.name, data: base64 }),
-        });
-        let ret = null;
-        try { ret = await res.json(); } catch (e) { /* 非 JSON 响应 */ }
-        if (!ret || !ret.ok) {
-          throw new Error(ret && ret.msg ? ret.msg : "HTTP " + res.status);
-        }
-      }
+      // D1 分片：init → 逐片二进制直传 → finalize，不转 base64
+      setMsg(`D1 上传中… (${i + 1}/${total})：${file.name}`, "");
+      await uploadToShard(file, (done, cnt) => {
+        setMsg(`D1 上传中… ${file.name} 分片 ${done}/${cnt}`, "");
+      });
       succeeded.push(file.name);
     } catch (err) {
       failed.push(file.name + "（" + err.message + "）");
