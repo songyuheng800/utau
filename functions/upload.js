@@ -18,12 +18,16 @@ const MAX_RAW_SIZE = 50 * 1024 * 1024; // 单文件上限（默认 50MB，可调
 // GitHub Contents API 单文件上限 100MB。三者取交集，原始文件理论上限约 75MB。
 const ALLOWED_EXT = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
 const MAX_NAME_LEN = 200;
+// 小文件独立存储仓（新建，与旧仓 utau 共存；旧仓不删）
+const FILES_REPO = "utau-files";
+const DEPLOY_TAG = "files-repo=utau-files";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
   "Content-Type": "application/json",
+  "X-Deploy-Tag": DEPLOY_TAG,
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -32,10 +36,12 @@ const CORS_HEADERS = {
 
 export async function onRequest(context) {
   const { request, env } = context;
-  const { GH_TOKEN, GH_USER, GH_REPO } = env;
+  const { GH_TOKEN, GH_USER } = env;
+  // 文件统一写入独立新仓 FILES_REPO；旧仓 GH_REPO 仅用于日志，保留共存不删
+  const GH_REPO = env.GH_REPO || FILES_REPO;
 
-  if (!GH_TOKEN || !GH_USER || !GH_REPO) {
-    return json({ ok: false, msg: "后端环境变量未配置（GH_TOKEN / GH_USER / GH_REPO）" }, 500);
+  if (!GH_TOKEN || !GH_USER) {
+    return json({ ok: false, msg: "后端环境变量未配置（GH_TOKEN / GH_USER）" }, 500);
   }
 
   // 浏览器跨域预检（前端在 github.io，函数在 pages.dev，跨域必须处理）
@@ -45,28 +51,28 @@ export async function onRequest(context) {
 
   if (request.method === "GET") {
     const url = new URL(request.url);
-    // ?stats=密码 → 高管站查看访问日志
+    // ?stats=密码 → 高管站查看访问日志（读旧仓 logs.json）
     if (url.searchParams.has("stats")) {
       return handleStats(request, url.searchParams.get("stats"), env);
     }
-    // ?download=文件名 → 代理下载，强制浏览器保存
+    // ?download=文件名 → 代理下载，强制浏览器保存（新仓）
     if (url.searchParams.has("download")) {
-      return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, GH_REPO, request, env);
+      return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, FILES_REPO, request, env);
     }
-    return handleList(url, GH_TOKEN, GH_USER, GH_REPO);
+    return handleList(url, GH_TOKEN, GH_USER, FILES_REPO);
   }
 
   if (request.method === "POST") {
-    // ?track=1 → 记录页面访问
+    // ?track=1 → 记录页面访问（写旧仓 logs.json）
     const url = new URL(request.url);
     if (url.searchParams.get("track") === "1") {
       return handleTrack(request, env, "pageview");
     }
-    return handleUpload(request, GH_TOKEN, GH_USER, GH_REPO);
+    return handleUpload(request, GH_TOKEN, GH_USER, FILES_REPO);
   }
 
   if (request.method === "DELETE") {
-    return handleDelete(request, GH_TOKEN, GH_USER, GH_REPO, env);
+    return handleDelete(request, GH_TOKEN, GH_USER, FILES_REPO, env);
   }
 
   return json({ ok: false, msg: "方法错误" }, 405);
