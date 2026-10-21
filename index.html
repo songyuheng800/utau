@@ -430,9 +430,18 @@ function renderList(listId, files, exts) {
     link.type = "button";
     link.className = "download-link";
     link.textContent = "下载";
-    // GitHub 直连 raw CDN（绕开代理多一跳）；D1 走分片代理；fetch blob 强制落盘
     const dlUrl = item.source === "d1" ? (item.download || item.raw) : (item.raw || item.download);
-    link.onclick = () => saveFile(dlUrl, item.name, link);
+    if (item.source === "d1") {
+      // D1 大文件：原生流式跳转，边下边存，不整文件进内存
+      link.onclick = () => {
+        const a = document.createElement("a");
+        a.href = dlUrl; a.download = item.name;
+        document.body.appendChild(a); a.click(); a.remove();
+      };
+    } else {
+      // GitHub 小文件：raw CDN 直连 fetch blob，强制落盘文件名
+      link.onclick = () => saveFile(dlUrl, item.name, link);
+    }
 
     const copyBtn = document.createElement("button");
     copyBtn.type = "button";
