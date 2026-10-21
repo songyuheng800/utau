@@ -83,6 +83,13 @@ function json(obj, status = 200) {
 }
 
 /* ---------- 文件列表：遍历主仓(新)与兜底仓(旧)合并，同名新仓优先 ---------- */
+function listJson(files) {
+  // 带 30s 短缓存头：CDN/浏览器复用，减少每次刷新都打 GitHub API
+  const h = new Headers(CORS_HEADERS);
+  h.set("Cache-Control", "public, max-age=30");
+  return new Response(JSON.stringify({ ok: true, files }), { status: 200, headers: h });
+}
+
 async function handleList(requestUrl, token, user, repos, env) {
   const CACHE_KEY = "list:cache";
   // 30s 短缓存：GitHub 间歇 503 时直接回退缓存，列表稳定不空白
@@ -91,7 +98,7 @@ async function handleList(requestUrl, token, user, repos, env) {
       const hit = await env.TOKENS.get(CACHE_KEY);
       if (hit) {
         const parsed = JSON.parse(hit);
-        if (parsed && Date.now() - parsed.at < 30000) return json({ ok: true, files: parsed.files });
+        if (parsed && Date.now() - parsed.at < 30000) return listJson(parsed.files);
       }
     } catch (e) { /* 缓存损坏忽略 */ }
   }
@@ -141,7 +148,7 @@ async function handleList(requestUrl, token, user, repos, env) {
   } else if (files.length && env && env.TOKENS) {
     try { await env.TOKENS.put(CACHE_KEY, JSON.stringify({ at: Date.now(), files }), { expirationTtl: 30 }); } catch (e) {}
   }
-  return json({ ok: true, files });
+  return listJson(files);
 }
 
 /* ---------- 上传 ----------
