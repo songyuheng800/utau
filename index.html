@@ -197,7 +197,7 @@ async function retry(fn, n = 3) {
       return await fn(attempt);
     } catch (e) {
       lastErr = e;
-      if (attempt < n - 1) await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+      if (attempt < n - 1) await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
     }
   }
   throw lastErr;
