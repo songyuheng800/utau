@@ -262,9 +262,9 @@ uploadBtn.onclick = async () => {
     try {
       if (file.size <= GITHUB_MAX) {
         // 小文件 → 用户选的 GitHub 仓（multipart 二进制提交）
-        setMsg(`上传到 ${ghRepo}… (${i + 1}/${total})：${file.name}`, "");
-        const realRepo = await uploadToGithub(file, ghRepo);
-        succeeded.push(`${file.name} → ${realRepo || ghRepo}`);
+        setMsg(`上传到 GitHub（${ghRepo}）… (${i + 1}/${total})：${file.name}`, "");
+        await uploadToGithub(file, ghRepo);
+        succeeded.push(`${file.name} → GitHub`);
       } else {
         // 大文件 → D1 分片：init → 逐片二进制直传 → finalize
         setMsg(`D1 上传中… (${i + 1}/${total})：${file.name}`, "");
@@ -348,10 +348,10 @@ function renderList(listId, files, exts) {
     name.textContent = item.name;
     name.title = item.name;
 
-    // 来源仓库标签：D1 / utau-files / utau
+    // 来源标签：D1 / GitHub
     const badge = document.createElement("span");
     badge.className = "src-badge";
-    badge.textContent = item.source === "d1" ? "D1" : (item.repo || "GitHub");
+    badge.textContent = item.source === "d1" ? "D1" : "GitHub";
 
     const link = document.createElement("a");
     link.className = "download-link";
