@@ -215,8 +215,8 @@ async function shardPost(path, body) {
   });
 }
 
-// 分片并行上传并发度（多路上行，不用一片一片排队）
-const CHUNK_PARALLEL = 6;
+// 分片上行并发度（免费 D1 并发写易冲突，取 2 路兼顾速度与稳定）
+const CHUNK_PARALLEL = 2;
 
 // 单片二进制直传：切片 Blob 直接进 FormData，不读 base64、不全量进内存
 async function uploadOneChunk(fileId, index, slice) {
@@ -232,7 +232,28 @@ async function uploadOneChunk(fileId, index, slice) {
   if (!r.ok) throw new Error("分片 " + index + " 失败：" + (r.msg || ""));
 }
 
-// D1 分片上传单文件：init → 多路并行 chunk → finalize 合成，返回 fileId
+// 并发池上传指定序号集合，完成一片报一片进度
+async function uploadIndices(file, fileId, indices, chunkCount, onProgress, doneRef) {
+  let cursor = 0;
+  const workers = [];
+  const n = Math.min(CHUNK_PARALLEL, indices.length);
+  for (let w = 0; w < n; w++) {
+    workers.push((async () => {
+      while (true) {
+        const k = cursor++;
+        if (k >= indices.length) return;
+        const i = indices[k];
+        const slice = file.slice(i * SHARD_CHUNK, Math.min((i + 1) * SHARD_CHUNK, file.size));
+        await uploadOneChunk(fileId, i, slice);
+        doneRef.n++;
+        if (onProgress) onProgress(doneRef.n, chunkCount);
+      }
+    })());
+  }
+  await Promise.all(workers);
+}
+
+// D1 分片上传单文件：init → 并行 chunk → finalize 合成；缺片自动补传直至齐全
 async function uploadToShard(file, onProgress) {
   const chunkCount = Math.max(1, Math.ceil(file.size / SHARD_CHUNK));
   const init = await shardPost("/init", {
@@ -245,27 +266,26 @@ async function uploadToShard(file, onProgress) {
   });
   if (!init.ok) throw new Error(init.msg || "初始化失败");
   const fileId = init.fileId;
+  const doneRef = { n: 0 };
 
-  // 并发池：最多 CHUNK_PARALLEL 路同时上传，完成一片报一片进度
-  let done = 0;
-  let cursor = 0;
-  const workers = [];
-  for (let w = 0; w < Math.min(CHUNK_PARALLEL, chunkCount); w++) {
-    workers.push((async () => {
-      while (true) {
-        const i = cursor++;
-        if (i >= chunkCount) return;
-        const slice = file.slice(i * SHARD_CHUNK, Math.min((i + 1) * SHARD_CHUNK, file.size));
-        await uploadOneChunk(fileId, i, slice);
-        done++;
-        if (onProgress) onProgress(done, chunkCount);
-      }
-    })());
+  // 首轮并行上传全部分片
+  await uploadIndices(file, fileId, Array.from({ length: chunkCount }, (_, i) => i), chunkCount, onProgress, doneRef);
+
+  // finalize 对账；缺片则串行补传（避免再次并发冲突），最多 3 轮自愈
+  for (let round = 0; round < 3; round++) {
+    const fin = await shardPost("/finalize", { fileId });
+    if (fin.ok) return fileId;
+    const missing = Array.isArray(fin.missing) ? fin.missing : [];
+    if (!missing.length) throw new Error(fin.msg || "对账失败");
+    for (const i of missing) {
+      const slice = file.slice(i * SHARD_CHUNK, Math.min((i + 1) * SHARD_CHUNK, file.size));
+      await uploadOneChunk(fileId, i, slice);
+      doneRef.n++;
+      if (onProgress) onProgress(doneRef.n, chunkCount);
+    }
   }
-  await Promise.all(workers);
-
-  const fin = await shardPost("/finalize", { fileId });
-  if (!fin.ok) throw new Error(fin.msg || "对账失败");
+  const fin2 = await shardPost("/finalize", { fileId });
+  if (!fin2.ok) throw new Error(fin2.msg || "对账失败");
   return fileId;
 }
 
