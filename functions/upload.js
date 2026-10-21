@@ -124,11 +124,13 @@ async function handleUpload(request, token, user, repos) {
   let data = "";
 
   const ct = request.headers.get("content-type") || "";
+  let targetRepo = "";
   if (ct.includes("multipart/form-data")) {
     let form;
     try { form = await request.formData(); }
     catch (e) { return json({ ok: false, msg: " multipart 解析失败" }, 400); }
     rawName = String(form.get("filename") || "");
+    targetRepo = String(form.get("repo") || "");
     const part = form.get("file");
     if (!part || typeof part.arrayBuffer !== "function") {
       return json({ ok: false, msg: "缺少文件字段 file" }, 400);
@@ -144,11 +146,18 @@ async function handleUpload(request, token, user, repos) {
     try { body = await request.json(); }
     catch (e) { return json({ ok: false, msg: "请求体不是合法的 JSON" }, 400); }
     rawName = typeof body.filename === "string" ? body.filename : "";
+    targetRepo = typeof body.repo === "string" ? body.repo : "";
     data = typeof body.data === "string" ? body.data : "";
     const rawSize = Math.floor(data.length * 3 / 4);
     if (rawSize > MAX_RAW_SIZE) {
       return json({ ok: false, msg: "文件过大，上限 " + Math.floor(MAX_RAW_SIZE / 1024 / 1024) + " MB" }, 413);
     }
+  }
+
+  // 用户指定仓库：仅允许写入已授权仓，指定仓排为首选，其余仓作回退
+  let orderedRepos = repos;
+  if (targetRepo && repos.indexOf(targetRepo) !== -1) {
+    orderedRepos = [targetRepo, ...repos.filter((r) => r !== targetRepo)];
   }
 
   // 服务端再次校验扩展名（不信任前端）
@@ -164,9 +173,9 @@ async function handleUpload(request, token, user, repos) {
     return json({ ok: false, msg: "文件名不合法" }, 400);
   }
 
-  // 依次尝试各仓：主仓(新)授权失败/不可写时回退兜底仓(旧)，全部失败才报错
+  // 依次尝试各仓（首选为用户指定仓）：首选授权失败/不可写时回退其余仓，全部失败才报错
   let lastErr = "GitHub 写入失败";
-  for (const repo of repos) {
+  for (const repo of orderedRepos) {
     const putUrl = `https://api.github.com/repos/${user}/${repo}/contents/uploads/${filename}`;
     let resp, result = {};
     try {

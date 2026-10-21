@@ -28,6 +28,7 @@
   .file-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #eee; }
   .file-item:last-child { border-bottom: none; }
   .file-item .name { flex: 1; word-break: break-all; font-size: 14px; }
+  .file-item .src-badge { flex: none; font-size: 11px; color: #fff; background: #6c8cff; border-radius: 4px; padding: 1px 7px; }
   a { color: #0066cc; }
   a.disabled { color: #888; pointer-events: none; text-decoration: none; }
   .empty { color: #999; font-size: 13px; padding: 6px 0; }
@@ -47,7 +48,12 @@
 </div>
 
 <div class="agree-box" style="font-size:14px">
-  存储：小文件（≤20MB）存入 GitHub 独立仓 utau-files；大文件（&gt;20MB）走 D1 二进制直传，均提供直链下载。旧仓保留共存。
+  小文件（≤20MB）导入到：
+  <select id="ghRepo" style="font-size:14px">
+    <option value="utau-files">utau-files（独立小文件仓）</option>
+    <option value="utau">utau（旧仓库）</option>
+  </select>
+  ；大文件（&gt;20MB）自动走 D1 直传。列表会标注每个文件实际所在仓库。
 </div>
 
 <div class="agree-box">
@@ -87,10 +93,11 @@ const MAX_SIZE_SHARD = 500 * 1024 * 1024;
 const GITHUB_MAX = 20 * 1024 * 1024;
 const allowExt = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
 
-// 小文件 → GitHub 独立仓：FormData 二进制直传，前端不转 base64
-async function uploadToGithub(file, onProgress) {
+// 小文件 → GitHub：FormData 二进制直传，前端不转 base64；repo 指定写入仓库
+async function uploadToGithub(file, repo, onProgress) {
   const fd = new FormData();
   fd.append("filename", file.name);
+  if (repo) fd.append("repo", repo);
   fd.append("file", file, file.name);
   const r = await retry(async () => {
     const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
@@ -99,6 +106,7 @@ async function uploadToGithub(file, onProgress) {
   });
   if (!r.ok) throw new Error(r.msg || "GitHub 上传失败");
   if (onProgress) onProgress(1, 1);
+  return r.repo;
 }
 
 let selectedFiles = [];
@@ -245,6 +253,7 @@ async function uploadToShard(file, onProgress) {
 uploadBtn.onclick = async () => {
   if (selectedFiles.length === 0 || !agreeCheck.checked) return;
   uploadBtn.disabled = true;
+  const ghRepo = document.getElementById("ghRepo").value;
   const total = selectedFiles.length;
   const succeeded = [];
   const failed = [];
@@ -252,17 +261,18 @@ uploadBtn.onclick = async () => {
     const file = selectedFiles[i];
     try {
       if (file.size <= GITHUB_MAX) {
-        // 小文件 → GitHub 独立仓（multipart 二进制提交）
-        setMsg(`GitHub 上传中… (${i + 1}/${total})：${file.name}`, "");
-        await uploadToGithub(file);
+        // 小文件 → 用户选的 GitHub 仓（multipart 二进制提交）
+        setMsg(`上传到 ${ghRepo}… (${i + 1}/${total})：${file.name}`, "");
+        const realRepo = await uploadToGithub(file, ghRepo);
+        succeeded.push(`${file.name} → ${realRepo || ghRepo}`);
       } else {
         // 大文件 → D1 分片：init → 逐片二进制直传 → finalize
         setMsg(`D1 上传中… (${i + 1}/${total})：${file.name}`, "");
         await uploadToShard(file, (done, cnt) => {
           setMsg(`D1 上传中… ${file.name} 分片 ${done}/${cnt}`, "");
         });
+        succeeded.push(`${file.name} → D1`);
       }
-      succeeded.push(file.name);
     } catch (err) {
       failed.push(file.name + "（" + err.message + "）");
     }
@@ -338,6 +348,11 @@ function renderList(listId, files, exts) {
     name.textContent = item.name;
     name.title = item.name;
 
+    // 来源仓库标签：D1 / utau-files / utau
+    const badge = document.createElement("span");
+    badge.className = "src-badge";
+    badge.textContent = item.source === "d1" ? "D1" : (item.repo || "GitHub");
+
     const link = document.createElement("a");
     link.className = "download-link";
     link.href = item.download || item.raw;
@@ -360,6 +375,7 @@ function renderList(listId, files, exts) {
     };
 
     row.appendChild(name);
+    row.appendChild(badge);
     row.appendChild(link);
     row.appendChild(copyBtn);
     container.appendChild(row);
