@@ -351,10 +351,10 @@ async function loadFileList() {
   try { cached = JSON.parse(sessionStorage.getItem("fileListCache") || "null"); } catch (e) {}
   if (cached && cached.length) { renderAll(cached); refreshState(); }
 
-  // GitHub 与 D1 同时拉，谁先回谁，互不阻塞；失败静默保留缓存
+  // GitHub 与 D1 同时拉，5s 超时、单次尝试，503 快速放弃并保留缓存，不长挂
   const [ghRes, shardRes] = await Promise.allSettled([
-    retry(() => fetchJson(API_ENDPOINT + "?list=1"), 2),
-    retry(() => fetchJson(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`), 2),
+    retry(() => fetchJson(API_ENDPOINT + "?list=1", 5000), 1),
+    retry(() => fetchJson(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`, 5000), 1),
   ]);
   const gh = ghRes.status === "fulfilled" && ghRes.value ? ghRes.value : { files: [] };
   const sh = shardRes.status === "fulfilled" && shardRes.value ? shardRes.value : { files: [] };
