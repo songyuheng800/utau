@@ -215,7 +215,24 @@ async function shardPost(path, body) {
   });
 }
 
-// D1 分片上传单文件：init → 逐片 chunk → finalize，返回 fileId
+// 分片并行上传并发度（多路上行，不用一片一片排队）
+const CHUNK_PARALLEL = 6;
+
+// 单片二进制直传：切片 Blob 直接进 FormData，不读 base64、不全量进内存
+async function uploadOneChunk(fileId, index, slice) {
+  const fd = new FormData();
+  fd.append("fileId", fileId);
+  fd.append("index", String(index));
+  fd.append("file", slice, `part-${index}`);
+  const r = await retry(async () => {
+    const res = await fetch(SHARD_API + "/chunk", { method: "POST", body: fd });
+    if (res.status >= 500) throw new Error("HTTP " + res.status);
+    return res.json().catch(() => ({ ok: false, msg: "响应解析失败" }));
+  });
+  if (!r.ok) throw new Error("分片 " + index + " 失败：" + (r.msg || ""));
+}
+
+// D1 分片上传单文件：init → 多路并行 chunk → finalize 合成，返回 fileId
 async function uploadToShard(file, onProgress) {
   const chunkCount = Math.max(1, Math.ceil(file.size / SHARD_CHUNK));
   const init = await shardPost("/init", {
@@ -229,21 +246,23 @@ async function uploadToShard(file, onProgress) {
   if (!init.ok) throw new Error(init.msg || "初始化失败");
   const fileId = init.fileId;
 
-  for (let i = 0; i < chunkCount; i++) {
-    // 二进制直传：直接把切片 Blob 放进 FormData，不读成 base64、不全量进内存
-    const slice = file.slice(i * SHARD_CHUNK, Math.min((i + 1) * SHARD_CHUNK, file.size));
-    const fd = new FormData();
-    fd.append("fileId", fileId);
-    fd.append("index", String(i));
-    fd.append("file", slice, `part-${i}`);
-    const r = await retry(async () => {
-      const res = await fetch(SHARD_API + "/chunk", { method: "POST", body: fd });
-      if (res.status >= 500) throw new Error("HTTP " + res.status);
-      return res.json().catch(() => ({ ok: false, msg: "响应解析失败" }));
-    });
-    if (!r.ok) throw new Error("分片 " + i + " 失败：" + (r.msg || ""));
-    if (onProgress) onProgress(i + 1, chunkCount);
+  // 并发池：最多 CHUNK_PARALLEL 路同时上传，完成一片报一片进度
+  let done = 0;
+  let cursor = 0;
+  const workers = [];
+  for (let w = 0; w < Math.min(CHUNK_PARALLEL, chunkCount); w++) {
+    workers.push((async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= chunkCount) return;
+        const slice = file.slice(i * SHARD_CHUNK, Math.min((i + 1) * SHARD_CHUNK, file.size));
+        await uploadOneChunk(fileId, i, slice);
+        done++;
+        if (onProgress) onProgress(done, chunkCount);
+      }
+    })());
   }
+  await Promise.all(workers);
 
   const fin = await shardPost("/finalize", { fileId });
   if (!fin.ok) throw new Error(fin.msg || "对账失败");
@@ -266,10 +285,10 @@ uploadBtn.onclick = async () => {
         await uploadToGithub(file, ghRepo);
         succeeded.push(`${file.name} → GitHub`);
       } else {
-        // 大文件 → D1 分片：init → 逐片二进制直传 → finalize
-        setMsg(`D1 上传中… (${i + 1}/${total})：${file.name}`, "");
+        // 大文件 → D1 分片：init → 多路并行二进制直传 → finalize 合成
+        setMsg(`D1 并行上传中… (${i + 1}/${total})：${file.name}`, "");
         await uploadToShard(file, (done, cnt) => {
-          setMsg(`D1 上传中… ${file.name} 分片 ${done}/${cnt}`, "");
+          setMsg(`D1 并行上传中… ${file.name} 分片 ${done}/${cnt}`, "");
         });
         succeeded.push(`${file.name} → D1`);
       }
@@ -286,40 +305,40 @@ uploadBtn.onclick = async () => {
   refreshState();
 };
 
-/* ---------- 文件列表：合并旧 GitHub 仓库 + D1 分片池 ---------- */
+/* ---------- 文件列表：GitHub 仓库 + D1 分片池，两路并行、短超时 ---------- */
+async function fetchJson(url, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (r.status >= 500) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function loadFileList() {
-  let oldFiles = [];
-  let shardFiles = [];
-  // D1 是主源：网络抖动/5xx 自动重试，避免偶发 503 导致列表看起来全空
-  let shardRes = { files: [] };
-  try {
-    shardRes = await retry(async () => {
-      const r = await fetch(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`);
-      if (r.status >= 500) throw new Error("HTTP " + r.status);
-      return r.json();
-    });
-  } catch (e) { /* 重试耗尽后保留空，不覆盖已有渲染 */ }
-  // GitHub 独立仓（小文件）：网络抖动/5xx 自动重试，失败静默保留空
-  let ghRes = { files: [] };
-  try {
-    ghRes = await retry(async () => {
-      const r = await fetch(API_ENDPOINT + "?list=1");
-      if (r.status >= 500) throw new Error("HTTP " + r.status);
-      return r.json();
-    });
-  } catch (e) {}
-  oldFiles = ((ghRes && ghRes.files) ? ghRes.files : []).map(f => ({ ...f, source: "github" }));
+  // GitHub 与 D1 同时拉，谁先回谁，互不阻塞；失败静默保留空
+  const [ghRes, shardRes] = await Promise.allSettled([
+    retry(() => fetchJson(API_ENDPOINT + "?list=1"), 2),
+    retry(() => fetchJson(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`), 2),
+  ]);
+  const gh = ghRes.status === "fulfilled" && ghRes.value ? ghRes.value : { files: [] };
+  const sh = shardRes.status === "fulfilled" && shardRes.value ? shardRes.value : { files: [] };
+
+  const oldFiles = ((gh && gh.files) ? gh.files : []).map(f => ({ ...f, source: "github" }));
   // D1 文件统一成 {name, raw, download}，下载走分片流式组装
-  shardFiles = ((shardRes && shardRes.files) ? shardRes.files : []).map(f => ({
+  const shardFiles = ((sh && sh.files) ? sh.files : []).map(f => ({
     name: f.name,
     raw: `${SHARD_API}/file?fileId=${f.fileId}`,
     download: `${SHARD_API}/file?fileId=${f.fileId}`,
     source: "d1",
   }));
-  // 按文件名去重：同名优先 D1，GitHub 副本不重复列出
+  // 按文件名去重：GitHub 优先，D1 同名副本不重复列出
   const byName = new Map();
-  for (const f of oldFiles) byName.set(f.name, f);
   for (const f of shardFiles) byName.set(f.name, f);
+  for (const f of oldFiles) byName.set(f.name, f);
   const files = [...byName.values()];
   renderList("list-ust", files, ["ust"]);
   renderList("list-ustx", files, ["ustx"]);
