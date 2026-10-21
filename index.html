@@ -338,8 +338,20 @@ async function fetchJson(url, timeoutMs = 8000) {
   }
 }
 
+function renderAll(files) {
+  renderList("list-ust", files, ["ust"]);
+  renderList("list-ustx", files, ["ustx"]);
+  renderList("list-vocaloid", files, ["vsq", "vsqx", "vpr", "pp2", "pp3"]);
+  renderList("list-ziprar", files, ["zip", "rar"]);
+}
+
 async function loadFileList() {
-  // GitHub 与 D1 同时拉，谁先回谁，互不阻塞；失败静默保留空
+  // 首屏先用本地缓存立即渲染，后台再拉最新，避免空白等待
+  let cached = null;
+  try { cached = JSON.parse(sessionStorage.getItem("fileListCache") || "null"); } catch (e) {}
+  if (cached && cached.length) { renderAll(cached); refreshState(); }
+
+  // GitHub 与 D1 同时拉，谁先回谁，互不阻塞；失败静默保留缓存
   const [ghRes, shardRes] = await Promise.allSettled([
     retry(() => fetchJson(API_ENDPOINT + "?list=1"), 2),
     retry(() => fetchJson(`${SHARD_API}/list?tag=${encodeURIComponent(HOME_TAG)}`), 2),
@@ -360,10 +372,8 @@ async function loadFileList() {
   for (const f of shardFiles) byName.set(f.name, f);
   for (const f of oldFiles) byName.set(f.name, f);
   const files = [...byName.values()];
-  renderList("list-ust", files, ["ust"]);
-  renderList("list-ustx", files, ["ustx"]);
-  renderList("list-vocaloid", files, ["vsq", "vsqx", "vpr", "pp2", "pp3"]);
-  renderList("list-ziprar", files, ["zip", "rar"]);
+  renderAll(files);
+  try { sessionStorage.setItem("fileListCache", JSON.stringify(files)); } catch (e) {}
   refreshState();
 }
 

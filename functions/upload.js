@@ -84,23 +84,27 @@ function json(obj, status = 200) {
 
 /* ---------- 文件列表：遍历主仓(新)与兜底仓(旧)合并，同名新仓优先 ---------- */
 async function handleList(requestUrl, token, user, repos) {
-  const byName = new Map();
-  for (const repo of repos) {
-    let apiRes;
+  // 两仓并行拉取，再按 repos 顺序合并（新仓优先，同名旧仓不覆盖）
+  const fetched = await Promise.all(repos.map(async (repo) => {
     try {
-      apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/uploads`, {
+      const apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/uploads`, {
         headers: {
           Authorization: `token ${token}`,
           "User-Agent": "utau-sharing-proxy",
           Accept: "application/vnd.github+json",
         },
       });
-    } catch (e) { continue; }
-    if (!apiRes.ok) continue;
-    let list;
-    try { list = await apiRes.json(); } catch (e) { continue; }
-    if (!Array.isArray(list)) continue;
-    for (const x of list.filter((f) => f.type === "file")) {
+      if (!apiRes.ok) return { repo, files: [] };
+      const list = await apiRes.json();
+      return { repo, files: Array.isArray(list) ? list.filter((f) => f.type === "file") : [] };
+    } catch (e) {
+      return { repo, files: [] };
+    }
+  }));
+
+  const byName = new Map();
+  for (const { repo, files } of fetched) {
+    for (const x of files) {
       if (byName.has(x.name)) continue; // 同名先入为主：新仓优先，旧仓不覆盖
       byName.set(x.name, {
         name: x.name,
