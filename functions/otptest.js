@@ -154,6 +154,34 @@ async function handleLogout(body, kv) {
   return json({ ok: true });
 }
 
+// 临时诊断：探测函数到 QQ SMTP 各端口的连通与问候
+async function handleDiag() {
+  const probes = [
+    { h: "smtp.qq.com", p: 465, st: "on" },
+    { h: "smtp.qq.com", p: 587, st: undefined },
+    { h: "smtp.qq.com", p: 25, st: undefined },
+  ];
+  const out = [];
+  for (const pr of probes) {
+    const r = { port: pr.p };
+    let socket;
+    try {
+      const opt = { hostname: pr.h, port: pr.p };
+      if (pr.st === "on") opt.secureTransport = "on";
+      socket = connect(opt);
+      const reader = socket.readable.getReader();
+      const { value } = await Promise.race([
+        reader.read(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("连接/问候超时")), 6000)),
+      ]);
+      r.greeting = new TextDecoder().decode(value).slice(0, 100);
+    } catch (e) { r.error = e.message; }
+    finally { try { if (socket) socket.close(); } catch (_) {} }
+    out.push(r);
+  }
+  return json({ ok: true, probes: out });
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -165,6 +193,7 @@ export async function onRequest(context) {
   const action = url.searchParams.get("action");
 
   if (request.method === "GET" && action === "me") return handleMe(request, kv);
+  if (request.method === "GET" && action === "diag") return handleDiag();
 
   if (request.method === "POST") {
     let body;
