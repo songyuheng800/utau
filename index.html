@@ -96,20 +96,28 @@ const MAX_SIZE_SHARD = 500 * 1024 * 1024;
 const GITHUB_MAX = 20 * 1024 * 1024;
 const allowExt = ["ust", "ustx", "vsq", "vsqx", "vpr", "pp2", "pp3", "zip", "rar"];
 
-// 小文件 → GitHub：FormData 二进制直传，前端不转 base64；repo 指定写入仓库
-async function uploadToGithub(file, repo, onProgress) {
-  const fd = new FormData();
-  fd.append("filename", file.name);
-  if (repo) fd.append("repo", repo);
-  fd.append("file", file, file.name);
-  const r = await retry(async () => {
-    const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
-    if (res.status >= 500) throw new Error("HTTP " + res.status);
-    return res.json().catch(() => ({ ok: false, msg: "响应解析失败" }));
+// 小文件 → GitHub：XHR 二进制直传，带真实上传进度；前端不转 base64；repo 指定写入仓库
+function uploadToGithub(file, repo, onProgress) {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append("filename", file.name);
+    if (repo) fd.append("repo", repo);
+    fd.append("file", file, file.name);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", API_ENDPOINT);
+    // 真实上传进度，避免大文件时看似卡死
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total);
+    };
+    xhr.onload = () => {
+      let r;
+      try { r = JSON.parse(xhr.responseText); } catch (e) { r = { ok: false, msg: "响应解析失败" }; }
+      if (xhr.status >= 500 || !r.ok) { reject(new Error(r.msg || "GitHub 上传失败")); return; }
+      resolve(r.repo);
+    };
+    xhr.onerror = () => reject(new Error("网络错误，上传中断"));
+    xhr.send(fd);
   });
-  if (!r.ok) throw new Error(r.msg || "GitHub 上传失败");
-  if (onProgress) onProgress(1, 1);
-  return r.repo;
 }
 
 let selectedFiles = [];
@@ -304,9 +312,12 @@ uploadBtn.onclick = async () => {
     const file = selectedFiles[i];
     try {
       if (file.size <= GITHUB_MAX) {
-        // 小文件 → 用户选的 GitHub 仓（multipart 二进制提交）
+        // 小文件 → 用户选的 GitHub 仓（multipart 二进制提交，带真实进度）
         setMsg(`上传到 GitHub（${ghRepo}）… (${i + 1}/${total})：${file.name}`, "");
-        await uploadToGithub(file, ghRepo);
+        await uploadToGithub(file, ghRepo, (loaded, size) => {
+          const pct = Math.round((loaded / size) * 100);
+          setMsg(`上传中 ${pct}%  ${file.name}`, "");
+        });
         succeeded.push(`${file.name} → GitHub`);
       } else {
         // 大文件 → D1 分片：init → 多路并行二进制直传 → finalize 合成
