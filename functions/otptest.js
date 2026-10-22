@@ -71,12 +71,13 @@ class SmtpSession {
 
 async function sendCodeEmail(env, to, code) {
   const host = env.SMTP_HOST || "smtp.qq.com";
-  const port = parseInt(env.SMTP_PORT || "465", 10);
+  // CF 函数出口 465 超时、25 被禁，走 587 + STARTTLS
+  const port = parseInt(env.SMTP_PORT || "587", 10);
   const user = env.SMTP_USER;
   const pass = env.SMTP_PASS;
   if (!user || !pass) throw new Error("SMTP 未配置（SMTP_USER / SMTP_PASS）");
 
-  const socket = connect({ hostname: host, port, secureTransport: "on" });
+  const socket = connect({ hostname: host, port, secureTransport: "starttls" });
   try {
     const s = new SmtpSession(socket.readable.getReader(), socket.writable.getWriter());
     await s.line();
