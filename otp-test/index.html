@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>邮箱验证码登录 · 测试站</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #0f1220; color: #e8eaf2; padding: 16px;
+  }
+  .card {
+    width: 100%; max-width: 380px; background: #1a1e30; border-radius: 16px;
+    padding: 32px 28px; box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  .sub { font-size: 13px; color: #9aa0b8; margin-bottom: 24px; }
+  label { font-size: 13px; color: #b8bdd0; display: block; margin: 14px 0 6px; }
+  input {
+    width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid #2c3350;
+    background: #121527; color: #e8eaf2; font-size: 15px; outline: none;
+  }
+  input:focus { border-color: #6c8cff; }
+  .row { display: flex; gap: 10px; }
+  .row input { flex: 1; }
+  button {
+    cursor: pointer; border: 0; border-radius: 10px; padding: 11px 16px; font-size: 15px;
+    background: #4f7cff; color: #fff; transition: opacity .15s;
+  }
+  button:hover { opacity: .9; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .ghost { background: #262c47; }
+  .code-btn { white-space: nowrap; }
+  #result { margin-top: 18px; font-size: 14px; line-height: 1.6; }
+  .err { color: #ff8a8a; }
+  .ok { color: #7ee0a8; }
+  .dev { color: #ffd27a; margin-top: 8px; font-size: 13px; }
+  .welcome { text-align: center; padding: 20px 0; }
+  .welcome .mail { font-size: 18px; color: #7ee0a8; margin: 10px 0; }
+  .welcome button { margin-top: 16px; }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1>邮箱验证码登录</h1>
+    <div class="sub">测试站 · 输入邮箱获取验证码即可登录</div>
+
+    <div id="loginView">
+      <label>邮箱</label>
+      <input id="email" type="email" placeholder="you@example.com" autocomplete="email">
+
+      <label>验证码</label>
+      <div class="row">
+        <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码">
+        <button id="sendBtn" class="code-btn ghost">发送验证码</button>
+      </div>
+
+      <div style="margin-top:18px">
+        <button id="loginBtn" style="width:100%">登录</button>
+      </div>
+      <div id="result"></div>
+    </div>
+
+    <div id="okView" class="welcome" style="display:none">
+      <div style="font-size:40px">✓</div>
+      <div>登录成功</div>
+      <div class="mail" id="welcomeMail"></div>
+      <button class="ghost" onclick="logout()">退出登录</button>
+    </div>
+  </div>
+
+<script>
+const API = "/otptest";
+let countdown = 0, timer = null;
+
+function msg(text, cls) {
+  const el = document.getElementById("result");
+  el.className = cls || "";
+  el.textContent = text;
+}
+
+function tick() {
+  const b = document.getElementById("sendBtn");
+  if (countdown <= 0) { b.disabled = false; b.textContent = "发送验证码"; clearInterval(timer); return; }
+  b.disabled = true; b.textContent = countdown + "s 后重发";
+  countdown--;
+}
+
+document.getElementById("sendBtn").onclick = async () => {
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg("邮箱格式不正确", "err"); return; }
+  const b = document.getElementById("sendBtn"); b.disabled = true; b.textContent = "发送中…";
+  try {
+    const r = await fetch(API + "?action=sendcode", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      msg(d.msg, "ok");
+      if (d.devCode) {
+        const dv = document.createElement("div");
+        dv.className = "dev";
+        dv.textContent = "测试模式验证码：" + d.devCode + "（" + (d.note || "") + "）";
+        document.getElementById("result").appendChild(dv);
+      }
+      countdown = 60; tick(); timer = setInterval(tick, 1000);
+    } else { msg(d.msg || "发送失败", "err"); b.disabled = false; b.textContent = "发送验证码"; }
+  } catch (e) { msg("网络错误：" + e.message, "err"); b.disabled = false; b.textContent = "发送验证码"; }
+};
+
+document.getElementById("loginBtn").onclick = async () => {
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const code = document.getElementById("code").value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg("邮箱格式不正确", "err"); return; }
+  if (!/^\d{6}$/.test(code)) { msg("验证码为 6 位数字", "err"); return; }
+  const btn = document.getElementById("loginBtn"); btn.disabled = true; btn.textContent = "登录中…";
+  try {
+    const r = await fetch(API + "?action=verify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      sessionStorage.setItem("otp_token", d.token);
+      document.getElementById("loginView").style.display = "none";
+      document.getElementById("okView").style.display = "block";
+      document.getElementById("welcomeMail").textContent = d.email;
+    } else { msg(d.msg || "登录失败", "err"); }
+  } catch (e) { msg("网络错误：" + e.message, "err"); }
+  btn.disabled = false; btn.textContent = "登录";
+};
+
+async function logout() {
+  const token = sessionStorage.getItem("otp_token");
+  try { await fetch(API + "?action=logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) }); } catch (e) {}
+  sessionStorage.removeItem("otp_token");
+  location.reload();
+}
+</script>
+</body>
+</html>
