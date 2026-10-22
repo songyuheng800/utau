@@ -381,24 +381,28 @@ async function loadFileList() {
   refreshState();
 }
 
-// fetch 成 blob 再落盘：继承 raw CDN 速度，跨域也能强制指定文件名保存
-async function saveFile(url, name, btn) {
+// fetch 成 blob 再落盘：先走 CDN 镜像，失败回退 raw；跨域也能强制指定文件名保存
+async function saveFile(candidates, name, btn) {
   const old = btn.textContent;
   btn.disabled = true; btn.textContent = "下载中…";
-  try {
-    const r = await fetch(url, { credentials: "omit" });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const blob = await r.blob();
-    const u = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = u; a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(u), 4000);
-  } catch (e) {
-    setMsg("下载失败：" + e.message, "error");
-  } finally {
-    btn.disabled = false; btn.textContent = old;
+  const urls = (Array.isArray(candidates) ? candidates : [candidates]).filter(Boolean);
+  let lastErr = null;
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { credentials: "omit" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const blob = await r.blob();
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 4000);
+      lastErr = null;
+      break;
+    } catch (e) { lastErr = e; }
   }
+  if (lastErr) setMsg("下载失败：" + lastErr.message, "error");
+  btn.disabled = false; btn.textContent = old;
 }
 
 function renderList(listId, files, exts) {
@@ -430,8 +434,8 @@ function renderList(listId, files, exts) {
     link.type = "button";
     link.className = "download-link";
     link.textContent = "下载";
-    const dlUrl = item.source === "d1" ? (item.download || item.raw) : (item.raw || item.download);
     if (item.source === "d1") {
+      const dlUrl = item.download || item.raw;
       // D1 大文件：原生流式跳转，边下边存，不整文件进内存
       link.onclick = () => {
         const a = document.createElement("a");
@@ -439,8 +443,8 @@ function renderList(listId, files, exts) {
         document.body.appendChild(a); a.click(); a.remove();
       };
     } else {
-      // GitHub 小文件：raw CDN 直连 fetch blob，强制落盘文件名
-      link.onclick = () => saveFile(dlUrl, item.name, link);
+      // GitHub 小文件：先走 gcore CDN 镜像，失败回退 raw，fetch blob 强制落盘
+      link.onclick = () => saveFile([item.mirror, item.raw], item.name, link);
     }
 
     const copyBtn = document.createElement("button");
@@ -448,7 +452,7 @@ function renderList(listId, files, exts) {
     copyBtn.textContent = "复制直链";
     copyBtn.onclick = async () => {
       try {
-        await navigator.clipboard.writeText(item.raw);
+        await navigator.clipboard.writeText(item.mirror || item.raw || item.download);
         copyBtn.textContent = "已复制";
         setTimeout(() => { copyBtn.textContent = "复制直链"; }, 1500);
       } catch (e) {

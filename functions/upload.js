@@ -129,6 +129,7 @@ async function handleList(requestUrl, token, user, repos, env) {
       byName.set(x.name, {
         name: x.name,
         raw: `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(x.name)}`,
+        mirror: `https://gcore.jsdelivr.net/gh/${user}/${repo}@main/uploads/${encodeURIComponent(x.name)}`,
         download: `${requestUrl.origin}/upload?download=${encodeURIComponent(x.name)}`,
         repo,
       });
