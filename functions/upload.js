@@ -59,7 +59,7 @@ export async function onRequest(context) {
     if (url.searchParams.has("download")) {
       return handleDownload(url.searchParams.get("download"), GH_TOKEN, GH_USER, request, env, [FILES_REPO, FALLBACK_REPO].filter(Boolean));
     }
-    return handleList(url, GH_TOKEN, GH_USER, [FILES_REPO, FALLBACK_REPO].filter(Boolean), env);
+    return handleList(url, GH_TOKEN, GH_USER, [FILES_REPO, FALLBACK_REPO].filter(Boolean), env, request);
   }
 
   if (request.method === "POST") {
@@ -83,73 +83,108 @@ function json(obj, status = 200) {
 }
 
 /* ---------- 文件列表：遍历主仓(新)与兜底仓(旧)合并，同名新仓优先 ---------- */
-function listJson(files) {
-  // 带 30s 短缓存头：CDN/浏览器复用，减少每次刷新都打 GitHub API
+// 轻量 FNV-1a 哈希，用于列表 ETag（内容变则标签变）
+function fnv1a(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function listEtag(files) {
+  return 'W/"' + fnv1a(files.map((f) => f.name + "|" + f.repo).join(",")) + '"';
+}
+
+function listJson(files, etag) {
+  // max-age=30 边缘/浏览器复用；stale-while-revalidate=60 先返旧版后台刷新，永不空白
   const h = new Headers(CORS_HEADERS);
-  h.set("Cache-Control", "public, max-age=30");
+  h.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+  if (etag) h.set("ETag", etag);
   return new Response(JSON.stringify({ ok: true, files }), { status: 200, headers: h });
 }
 
-async function handleList(requestUrl, token, user, repos, env) {
+function notModified(etag) {
+  const h = new Headers(CORS_HEADERS);
+  h.set("ETag", etag);
+  h.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+  return new Response(null, { status: 304, headers: h });
+}
+
+async function handleList(requestUrl, token, user, repos, env, request) {
   const CACHE_KEY = "list:cache";
+  let files = [];
+  let freshFromKv = false;
+
   // 30s 短缓存：GitHub 间歇 503 时直接回退缓存，列表稳定不空白
   if (env && env.TOKENS) {
     try {
       const hit = await env.TOKENS.get(CACHE_KEY);
       if (hit) {
         const parsed = JSON.parse(hit);
-        if (parsed && Date.now() - parsed.at < 30000) return listJson(parsed.files);
+        if (parsed && Date.now() - parsed.at < 30000) {
+          files = parsed.files || [];
+          freshFromKv = true;
+        }
       }
     } catch (e) { /* 缓存损坏忽略 */ }
   }
 
-  // 两仓并行拉取，再按 repos 顺序合并（新仓优先，同名旧仓不覆盖）
-  let fetched;
-  try {
-    fetched = await Promise.all(repos.map(async (repo) => {
-      const apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/uploads`, {
-        headers: {
-          Authorization: `token ${token}`,
-          "User-Agent": "utau-sharing-proxy",
-          Accept: "application/vnd.github+json",
-        },
-      });
-      if (!apiRes.ok) return { repo, files: [] };
-      const list = await apiRes.json();
-      return { repo, files: Array.isArray(list) ? list.filter((f) => f.type === "file") : [] };
-    }));
-  } catch (e) {
-    fetched = [];
-  }
+  if (!freshFromKv) {
+    // 两仓并行拉取，再按 repos 顺序合并（新仓优先，同名旧仓不覆盖）
+    let fetched;
+    try {
+      fetched = await Promise.all(repos.map(async (repo) => {
+        const apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/uploads`, {
+          headers: {
+            Authorization: `token ${token}`,
+            "User-Agent": "utau-sharing-proxy",
+            Accept: "application/vnd.github+json",
+          },
+        });
+        if (!apiRes.ok) return { repo, files: [] };
+        const list = await apiRes.json();
+        return { repo, files: Array.isArray(list) ? list.filter((f) => f.type === "file") : [] };
+      }));
+    } catch (e) {
+      fetched = [];
+    }
 
-  const byName = new Map();
-  for (const { repo, files } of fetched) {
-    for (const x of files) {
-      if (byName.has(x.name)) continue; // 同名先入为主：新仓优先，旧仓不覆盖
-      byName.set(x.name, {
-        name: x.name,
-        raw: `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(x.name)}`,
-        mirror: `https://gcore.jsdelivr.net/gh/${user}/${repo}@main/uploads/${encodeURIComponent(x.name)}`,
-        download: `${requestUrl.origin}/upload?download=${encodeURIComponent(x.name)}`,
-        repo,
-      });
+    const byName = new Map();
+    for (const { repo, files: rf } of fetched) {
+      for (const x of rf) {
+        if (byName.has(x.name)) continue; // 同名先入为主：新仓优先，旧仓不覆盖
+        byName.set(x.name, {
+          name: x.name,
+          raw: `https://raw.githubusercontent.com/${user}/${repo}/main/uploads/${encodeURIComponent(x.name)}`,
+          mirror: `https://gcore.jsdelivr.net/gh/${user}/${repo}@main/uploads/${encodeURIComponent(x.name)}`,
+          download: `${requestUrl.origin}/upload?download=${encodeURIComponent(x.name)}`,
+          repo,
+        });
+      }
+    }
+    files = [...byName.values()].sort((a, b) => b.name.localeCompare(a.name));
+
+    // 拉到空（503/抖动）时回退缓存，避免列表变空
+    if (files.length === 0 && env && env.TOKENS) {
+      try {
+        const hit = await env.TOKENS.get(CACHE_KEY);
+        if (hit) {
+          const parsed = JSON.parse(hit);
+          if (parsed && Array.isArray(parsed.files)) files = parsed.files;
+        }
+      } catch (e) { /* ignore */ }
+    } else if (files.length && env && env.TOKENS) {
+      try { await env.TOKENS.put(CACHE_KEY, JSON.stringify({ at: Date.now(), files }), { expirationTtl: 30 }); } catch (e) {}
     }
   }
-  let files = [...byName.values()].sort((a, b) => b.name.localeCompare(a.name));
 
-  // 拉到空（503/抖动）时回退缓存，避免列表变空
-  if (files.length === 0 && env && env.TOKENS) {
-    try {
-      const hit = await env.TOKENS.get(CACHE_KEY);
-      if (hit) {
-        const parsed = JSON.parse(hit);
-        if (parsed && Array.isArray(parsed.files)) files = parsed.files;
-      }
-    } catch (e) { /* ignore */ }
-  } else if (files.length && env && env.TOKENS) {
-    try { await env.TOKENS.put(CACHE_KEY, JSON.stringify({ at: Date.now(), files }), { expirationTtl: 30 }); } catch (e) {}
-  }
-  return listJson(files);
+  // ETag/304：内容未变直接回 304，不传重复 JSON
+  const etag = listEtag(files);
+  const inm = request && request.headers.get("If-None-Match");
+  if (inm && inm === etag) return notModified(etag);
+  return listJson(files, etag);
 }
 
 /* ---------- 上传 ----------

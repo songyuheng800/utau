@@ -335,6 +335,7 @@ async function fetchJson(url, timeoutMs = 8000) {
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const r = await fetch(url, { signal: ctrl.signal });
+    if (r.status === 304) return { files: [] }; // 未变更，用本地缓存兜底
     if (r.status >= 500) throw new Error("HTTP " + r.status);
     return await r.json();
   } finally {
@@ -471,6 +472,15 @@ function renderList(listId, files, exts) {
 loadFileList();
 // 记录页面访问
 navigator.sendBeacon(API_ENDPOINT + "?track=1", JSON.stringify({}));
+
+// 回到前台时静默刷新一次列表缓存（30s 节流），保证下次打开即最新
+let lastBgRefresh = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && Date.now() - lastBgRefresh > 30000) {
+    lastBgRefresh = Date.now();
+    loadFileList();
+  }
+});
 </script>
 <div style="text-align:center;margin-top:40px;padding-top:16px;border-top:1px solid #eee;font-size:13px;color:#888;line-height:1.8">
   <div>微信：18946843204</div>
