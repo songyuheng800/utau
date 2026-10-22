@@ -1,0 +1,11 @@
+# Cloudflare Pages 静态资源缓存头（仅作用于静态文件，Functions 路由 /upload 等不受影响）
+# 主站 HTML 本体不常变（列表由 JS 实时拉取），边缘缓存 60 秒复用
+/
+  Cache-Control: public, max-age=60
+/*.html
+  Cache-Control: public, max-age=60
+# 图标等内联为主，其余静态资源可长缓存
+/*.css
+  Cache-Control: public, max-age=86400
+/*.js
+  Cache-Control: public, max-age=86400
