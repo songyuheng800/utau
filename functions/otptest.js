@@ -34,11 +34,33 @@ function randomToken(len) {
 
 /* ---------- Resend HTTP API 发信（绕开 CF 函数受限的 SMTP 端口） ---------- */
 async function sendCodeEmail(env, to, code) {
-  const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY 未配置");
-  const from = env.MAIL_FROM || "onboarding@resend.dev";
   const subject = "邮箱登录验证码";
   const text = "你的登录验证码是：" + code + "\n\n10 分钟内有效，请勿泄露。非本人操作请忽略。";
+
+  // 优先 Brevo HTTP API（/v3/smtp/email）
+  const brevoKey = env.BREVO_API_KEY;
+  if (brevoKey) {
+    const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": brevoKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender: { name: "UTAU", email: env.MAIL_FROM || "13181260223@163.com" },
+        to: [{ email: to }],
+        subject,
+        textContent: text,
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error("Brevo " + r.status + "：" + t.slice(0, 140));
+    }
+    return;
+  }
+
+  // 回退：Resend 沙箱（仅能发注册邮箱本人）
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("未配置 BREVO_API_KEY / RESEND_API_KEY");
+  const from = env.MAIL_FROM || "onboarding@resend.dev";
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
