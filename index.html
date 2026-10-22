@@ -227,8 +227,8 @@ async function shardPost(path, body) {
   });
 }
 
-// 分片上行并发度（免费 D1 并发写易冲突，取 2 路兼顾速度与稳定）
-const CHUNK_PARALLEL = 2;
+// 分片上行并发度（免费 D1 并发写偶发冲突，缺片由 finalize 自愈补传兜底）
+const CHUNK_PARALLEL = 3;
 
 // 单片二进制直传：切片 Blob 直接进 FormData，不读 base64、不全量进内存
 async function uploadOneChunk(fileId, index, slice) {
