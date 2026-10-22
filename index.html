@@ -354,7 +354,7 @@ async function loadFileList() {
   // 首屏先用本地缓存立即渲染，后台再拉最新，避免空白等待
   let cached = null;
   try { cached = JSON.parse(sessionStorage.getItem("fileListCache") || "null"); } catch (e) {}
-  if (cached && cached.length) { renderAll(cached); refreshState(); }
+  if (cached && cached.length) { renderAll(cached); refreshState(); window.__listReady = true; }
 
   // GitHub 与 D1 同时拉，5s 超时、单次尝试，503 快速放弃并保留缓存，不长挂
   const [ghRes, shardRes] = await Promise.allSettled([
@@ -380,6 +380,7 @@ async function loadFileList() {
   renderAll(files);
   try { sessionStorage.setItem("fileListCache", JSON.stringify(files)); } catch (e) {}
   refreshState();
+  window.__listReady = true;
 }
 
 // fetch 成 blob 再落盘：先走 CDN 镜像，失败回退 raw；跨域也能强制指定文件名保存
@@ -472,6 +473,14 @@ function renderList(listId, files, exts) {
 loadFileList();
 // 记录页面访问
 navigator.sendBeacon(API_ENDPOINT + "?track=1", JSON.stringify({}));
+
+// github.io 打开 3 秒仍没成功拉到列表（503/网络慢），自动跳到 CF 快镜像；
+// 有本地缓存秒出或正常加载则不跳；CF 镜像站内不自跳
+if (location.hostname.endsWith("github.io")) {
+  setTimeout(() => {
+    if (!window.__listReady) location.replace("https://utau-4oo.pages.dev/");
+  }, 3000);
+}
 
 // 回到前台时静默刷新一次列表缓存（30s 节流），保证下次打开即最新
 let lastBgRefresh = 0;
