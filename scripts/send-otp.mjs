@@ -13,8 +13,6 @@ const transporter = nodemailer.createTransport({
   host: "smtp.qq.com",
   port: 465,
   secure: true,
-  debug: true,
-  logger: true,
   auth: { user: SMTP_USER, pass: SMTP_PASS },
 });
 
