@@ -35,7 +35,7 @@ function randomToken(len) {
 /* ---------- 发信：GitHub Actions 代发 QQ SMTP（绕开 CF 函数封禁 SMTP 端口） ---------- */
 async function sendCodeEmail(env, to, code) {
   const subject = "邮箱登录验证码";
-  const text = "你的登录验证码是：" + code + "\n\n10 分钟内有效，请勿泄露。非本人操作请忽略。";
+  const text = "你的登录验证码是：" + code + "\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）";
 
   // 通道1：触发 GitHub Actions，由 runner 连 smtp.qq.com:465 发信
   if (env.GH_TOKEN) {

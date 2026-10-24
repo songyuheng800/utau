@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 
 const text =
   TEXT ||
-  `你的登录验证码是：${CODE}\n\n10 分钟内有效，请勿泄露。非本人操作请忽略。`;
+  `你的登录验证码是：${CODE}\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）`;
 
 const info = await transporter.sendMail({
   from: `UTAU登录 <${SMTP_USER}>`,
