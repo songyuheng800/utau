@@ -105,17 +105,14 @@ async function handleSendCode(body, kv, env) {
   await kv.put("otp_code:" + email, code, { expirationTtl: CODE_TTL });
   await kv.put("otp_rl:" + email, "1", { expirationTtl: RATE_TTL });
 
-  // 真邮件发送；未配置/失败时走测试兜底（回传验证码），保证联调可点通
-  let devCode = null;
+  // 测试站：邮件照发，同时把验证码回传页面直接显示，不依赖邮件送达即可登录
   let failNote = "";
   try {
     await sendCodeEmail(env, email, code);
   } catch (e) {
-    devCode = code;
-    failNote = "邮件未发出（" + e.message + "），测试模式已回传验证码";
+    failNote = "邮件未发出（" + e.message + "），以下为页面验证码";
   }
-  const out = { ok: true, msg: "验证码已发送至 " + email };
-  if (devCode) { out.devCode = devCode; out.note = failNote; }
+  const out = { ok: true, msg: "验证码已发送至 " + email, devCode: code, note: failNote || "测试模式：验证码直接显示在页面" };
   return json(out);
 }
 
