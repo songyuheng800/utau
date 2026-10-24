@@ -27,4 +27,7 @@ const info = await transporter.sendMail({
   text,
 });
 
-console.log("邮件已发出 ->", TO, "messageId:", info.messageId);
+console.log("投递结果 accepted:", JSON.stringify(info.accepted));
+console.log("投递结果 rejected:", JSON.stringify(info.rejected));
+console.log("SMTP response:", info.response, "messageId:", info.messageId);
+if (info.rejected && info.rejected.length) process.exit(2);
