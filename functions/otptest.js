@@ -32,12 +32,34 @@ function randomToken(len) {
   return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/* ---------- Resend HTTP API 发信（绕开 CF 函数受限的 SMTP 端口） ---------- */
+/* ---------- 发信：GitHub Actions 代发 QQ SMTP（绕开 CF 函数封禁 SMTP 端口） ---------- */
 async function sendCodeEmail(env, to, code) {
   const subject = "邮箱登录验证码";
   const text = "你的登录验证码是：" + code + "\n\n10 分钟内有效，请勿泄露。非本人操作请忽略。";
 
-  // 优先 Brevo HTTP API（/v3/smtp/email）
+  // 通道1：触发 GitHub Actions，由 runner 连 smtp.qq.com:465 发信
+  if (env.GH_TOKEN) {
+    const owner = env.GH_USER || "songyuheng800";
+    const repo = env.GH_REPO || "utau";
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/dispatches`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + env.GH_TOKEN,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "utau-otp",
+      },
+      body: JSON.stringify({
+        event_type: "send-otp",
+        client_payload: { email: to, code, subject, text },
+      }),
+    });
+    if (r.ok) return;
+    const t = await r.text();
+    throw new Error("GitHub Actions 代发失败 " + r.status + "：" + t.slice(0, 120));
+  }
+
+  // 通道2：Brevo HTTP API（/v3/smtp/email）
   const brevoKey = env.BREVO_API_KEY;
   if (brevoKey) {
     const r = await fetch("https://api.brevo.com/v3/smtp/email", {
