@@ -20,11 +20,24 @@ const text =
   TEXT ||
   `你的登录验证码是：${CODE}\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）`;
 
+const html =
+  `<div style="font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;max-width:420px;margin:0 auto;padding:24px;">` +
+  `<h2 style="font-size:18px;margin:0 0 16px;">邮箱登录验证码</h2>` +
+  `<p style="font-size:14px;color:#333;">你的登录验证码是：</p>` +
+  `<div style="font-size:32px;letter-spacing:6px;font-weight:bold;color:#4f7c8f;margin:12px 0;">${CODE}</div>` +
+  `<p style="font-size:13px;color:#888;">（十分钟内有效，请勿泄露。非本人操作请忽略。）</p>` +
+  `</div>`;
+
 const info = await transporter.sendMail({
-  from: `UTAU登录 <${SMTP_USER}>`,
+  from: `"UTAU登录" <${SMTP_USER}>`,
   to: TO,
   subject: SUBJECT || "邮箱登录验证码",
   text,
+  html,
+  headers: {
+    "X-Mailer": "UTAU-OTP",
+    "List-Unsubscribe": `<mailto:${SMTP_USER}>`,
+  },
 });
 
 console.log("投递结果 accepted:", JSON.stringify(info.accepted));
