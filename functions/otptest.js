@@ -36,62 +36,72 @@ function randomToken(len) {
 async function sendCodeEmail(env, to, code) {
   const subject = "邮箱登录验证码";
   const text = "你的登录验证码是：" + code + "\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）";
+  const errs = [];
 
-  // 通道1：触发 GitHub Actions，由 runner 连 smtp.qq.com:465 发信
+  // 通道1：触发 GitHub Actions，由 runner 连 smtp.qq.com:465 发信；失败则降级，不直接中断
   if (env.GH_TOKEN) {
-    const owner = env.GH_USER || "songyuheng800";
-    const repo = env.GH_REPO || "utau";
-    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/dispatches`, {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + env.GH_TOKEN,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-        "User-Agent": "utau-otp",
-      },
-      body: JSON.stringify({
-        event_type: "send-otp",
-        client_payload: { email: to, code, subject, text },
-      }),
-    });
-    if (r.ok) return;
-    const t = await r.text();
-    throw new Error("GitHub Actions 代发失败 " + r.status + "：" + t.slice(0, 120));
+    try {
+      const owner = env.GH_USER || "songyuheng800";
+      const repo = env.GH_REPO || "utau";
+      const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/dispatches`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + env.GH_TOKEN,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+          "User-Agent": "utau-otp",
+        },
+        body: JSON.stringify({
+          event_type: "send-otp",
+          client_payload: { email: to, code, subject, text },
+        }),
+      });
+      if (r.ok) return;
+      const t = await r.text();
+      errs.push("GitHub Actions " + r.status + "：" + t.slice(0, 100));
+    } catch (e) {
+      errs.push("GitHub Actions 异常：" + e.message.slice(0, 100));
+    }
   }
 
   // 通道2：Brevo HTTP API（/v3/smtp/email）
-  const brevoKey = env.BREVO_API_KEY;
-  if (brevoKey) {
-    const r = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "api-key": brevoKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sender: { name: "UTAU", email: env.MAIL_FROM || "13181260223@163.com" },
-        to: [{ email: to }],
-        subject,
-        textContent: text,
-      }),
-    });
-    if (!r.ok) {
-      const t = await r.text();
-      throw new Error("Brevo " + r.status + "：" + t.slice(0, 140));
+  if (env.BREVO_API_KEY) {
+    try {
+      const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": env.BREVO_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender: { name: "UTAU", email: env.MAIL_FROM || "13181260223@163.com" },
+          to: [{ email: to }],
+          subject,
+          textContent: text,
+        }),
+      });
+      if (r.ok) return;
+      errs.push("Brevo " + r.status);
+    } catch (e) {
+      errs.push("Brevo 异常：" + e.message.slice(0, 100));
     }
-    return;
   }
 
-  // 回退：Resend 沙箱（仅能发注册邮箱本人）
-  const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("未配置 BREVO_API_KEY / RESEND_API_KEY");
-  const from = env.MAIL_FROM || "onboarding@resend.dev";
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [to], subject, text }),
-  });
-  if (!r.ok) {
-    const t = await r.text();
-    throw new Error("Resend " + r.status + "：" + t.slice(0, 140));
+  // 通道3：Resend（沙箱仅能发注册邮箱本人）
+  if (env.RESEND_API_KEY) {
+    try {
+      const from = env.MAIL_FROM || "onboarding@resend.dev";
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [to], subject, text }),
+      });
+      if (r.ok) return;
+      const t = await r.text();
+      errs.push("Resend " + r.status + "：" + t.slice(0, 100));
+    } catch (e) {
+      errs.push("Resend 异常：" + e.message.slice(0, 100));
+    }
   }
+
+  throw new Error(errs.length ? errs.join(" | ") : "未配置任何发信通道");
 }
 
 /* ---------- 操作 ---------- */
