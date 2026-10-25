@@ -1,20 +1,32 @@
-// GitHub Actions 代发：接收 repository_dispatch 的 client_payload，
-// 通过 QQ SMTP 465 发送验证码邮件。
+// GitHub Actions 代发：多 SMTP 节点池，主备故障转移。
+// 一号节点发不过去立刻转二号，依次轮转，第一个成功即返回。
+// 节点来源：Secret SMTP_NODES（JSON 数组，多节点）；兜底单账号 SMTP_USER/SMTP_PASS。
 import nodemailer from "nodemailer";
 
-const { SMTP_USER, SMTP_PASS, TO, CODE, SUBJECT, TEXT } = process.env;
+const { TO, CODE, SUBJECT, TEXT, SMTP_NODES, SMTP_USER, SMTP_PASS } = process.env;
 
-if (!SMTP_USER || !SMTP_PASS || !TO || !CODE) {
-  console.error("缺少 SMTP_USER/SMTP_PASS/TO/CODE 环境变量");
+if (!TO || !CODE) {
+  console.error("缺少 TO/CODE 环境变量");
   process.exit(1);
 }
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.qq.com",
-  port: 465,
-  secure: true,
-  auth: { user: SMTP_USER, pass: SMTP_PASS },
-});
+// 组装节点池
+let nodes = [];
+if (SMTP_NODES) {
+  try {
+    const parsed = JSON.parse(SMTP_NODES);
+    nodes = Array.isArray(parsed) ? parsed : [parsed];
+  } catch (e) {
+    console.error("SMTP_NODES 解析失败，回退单账号：", e.message);
+  }
+}
+if (!nodes.length && SMTP_USER && SMTP_PASS) {
+  nodes = [{ host: "smtp.qq.com", port: 465, secure: true, user: SMTP_USER, pass: SMTP_PASS }];
+}
+if (!nodes.length) {
+  console.error("未配置任何 SMTP 节点（SMTP_NODES 或 SMTP_USER/SMTP_PASS）");
+  process.exit(1);
+}
 
 const text =
   TEXT ||
@@ -28,19 +40,59 @@ const html =
   `<p style="font-size:13px;color:#888;">（十分钟内有效，请勿泄露。非本人操作请忽略。）</p>` +
   `</div>`;
 
-const info = await transporter.sendMail({
-  from: `"UTAU登录" <${SMTP_USER}>`,
-  to: TO,
-  subject: SUBJECT || "邮箱登录验证码",
-  text,
-  html,
-  headers: {
-    "X-Mailer": "UTAU-OTP",
-    "List-Unsubscribe": `<mailto:${SMTP_USER}>`,
-  },
-});
+const errors = [];
 
-console.log("投递结果 accepted:", JSON.stringify(info.accepted));
-console.log("投递结果 rejected:", JSON.stringify(info.rejected));
-console.log("SMTP response:", info.response, "messageId:", info.messageId);
-if (info.rejected && info.rejected.length) process.exit(2);
+// 逐个节点尝试，失败立即切下一个；短超时，快速轮转
+for (let i = 0; i < nodes.length; i++) {
+  const n = nodes[i];
+  const host = n.host || "smtp.qq.com";
+  const port = Number(n.port || 465);
+  const secure = n.secure !== false;
+  let transporter;
+  try {
+    transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
+      auth: { user: n.user, pass: n.pass },
+    });
+
+    const fromName = n.fromName || "UTAU登录";
+    const info = await transporter.sendMail({
+      from: `${fromName} <${n.user}>`,
+      to: TO,
+      subject: SUBJECT || "邮箱登录验证码",
+      text,
+      html,
+      headers: { "X-Mailer": "UTAU-OTP" },
+    });
+
+    const ok =
+      (!info.rejected || info.rejected.length === 0) &&
+      info.accepted && info.accepted.includes(TO);
+
+    if (ok) {
+      console.log(`节点${i + 1}(${n.user}@${host}) 成功`);
+      console.log("accepted:", JSON.stringify(info.accepted));
+      console.log("SMTP response:", info.response, "messageId:", info.messageId);
+      await transporter.close();
+      process.exit(0);
+    }
+    errors.push(`节点${i + 1}(${n.user}): 被拒绝 ${JSON.stringify(info.rejected)}`);
+    console.log(`节点${i + 1} 未成功，切换下一节点`);
+  } catch (e) {
+    errors.push(`节点${i + 1}(${n.user}@${host}): ${e.code || ""} ${e.message.slice(0, 120)}`);
+    console.log(`节点${i + 1}(${n.user}@${host}) 失败，切换下一节点：`, e.message.slice(0, 120));
+  } finally {
+    if (transporter) {
+      try { await transporter.close(); } catch {}
+    }
+  }
+}
+
+console.error("全部 SMTP 节点失败：");
+errors.forEach((x) => console.error(" -", x));
+process.exit(2);

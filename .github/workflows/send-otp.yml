@@ -18,6 +18,7 @@ jobs:
       - run: npm i nodemailer@6
       - name: send mail
         env:
+          SMTP_NODES: ${{ secrets.SMTP_NODES }}
           SMTP_USER: ${{ secrets.QQ_SMTP_USER }}
           SMTP_PASS: ${{ secrets.QQ_SMTP_PASS }}
           TO: ${{ github.event.client_payload.email }}
