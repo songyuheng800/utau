@@ -125,8 +125,10 @@
             <input type="text" id="otpCode" placeholder="6 位验证码" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
             <button class="pwd-btn otp-send" id="otpSendBtn">发送验证码</button>
           </div>
+          <input type="password" id="otpPwd" placeholder="设置密码（6-64 位，注册时填写）" autocomplete="new-password">
           <button class="pwd-btn primary" id="otpLoginBtn">验证码登录 / 注册</button>
-          <div class="pwd-hint">输入邮箱收取验证码即可登录，未注册的邮箱会自动创建本站账号。</div>
+          <button class="pwd-btn" id="otpPwdLoginBtn" style="width:100%;margin-top:8px">使用邮箱密码登录</button>
+          <div class="pwd-hint">首次用验证码登录时可在此设密码；之后直接用邮箱+密码登录，不必再收验证码。</div>
         </div>
         <div class="tip">
           <b>说明：</b>第三方登录点击后跳转对应平台授权，<br>确认后自动回到本站。
@@ -293,7 +295,7 @@
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code, password: $("otpPwd").value }),
       });
       const d = await r.json().catch(() => ({}));
       if (d.ok) {
@@ -305,6 +307,43 @@
         $("uLogin").textContent = email;
         $("title").textContent = "欢迎，" + (d.user.name || email);
         $("sub").textContent = "当前以 邮箱验证码 登录本站";
+      } else {
+        showMsg("err", d.msg || "登录失败");
+      }
+    } catch (e) {
+      showMsg("err", "网络错误，请稍后重试");
+    } finally {
+      btn.disabled = false; btn.textContent = old;
+    }
+  });
+
+  // 邮箱 + 密码直接登录（注册时设过密码的账号）
+  $("otpPwdLoginBtn").addEventListener("click", async () => {
+    const email = $("otpEmail").value.trim();
+    const password = $("otpPwd").value;
+    if (!OTP_EMAIL_RE.test(email)) return showMsg("err", "请填写正确的邮箱");
+    if (!password) return showMsg("err", "请输入密码");
+    const btn = $("otpPwdLoginBtn");
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "登录中…";
+    showMsg("info", "正在校验账号…");
+    try {
+      const r = await fetch(OTP_API + "?action=login-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d.ok) {
+        $("viewGuest").classList.add("hidden");
+        $("viewUser").classList.remove("hidden");
+        $("uAvatar").src = "";
+        $("uName").textContent = d.user.name || email;
+        $("uLogin").textContent = email;
+        $("title").textContent = "欢迎，" + (d.user.name || email);
+        $("sub").textContent = "当前以 邮箱密码 登录本站";
       } else {
         showMsg("err", d.msg || "登录失败");
       }

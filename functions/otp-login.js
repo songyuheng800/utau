@@ -67,6 +67,17 @@ function randomHex(len) {
   return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+async function pbkdf2(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: enc.encode(salt), iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    256
+  );
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /* ---------- 发信：GitHub Actions 代发 QQ SMTP（绕开 CF 函数封禁 SMTP 端口） ---------- */
 async function sendCodeEmail(env, to, code) {
   const subject = "邮箱登录验证码";
@@ -157,6 +168,43 @@ async function handleVerify(body, kv) {
   if (!stored || stored !== code) return json({ ok: false, msg: "验证码错误或已过期，请重新获取" }, 400);
 
   await kv.delete("otp_code:" + email);
+
+  // 注册时可一并设置密码：6-64 位，PBKDF2 加盐哈希落库
+  if (body.password) {
+    const pw = String(body.password || "");
+    if (pw.length < 6 || pw.length > 64) return json({ ok: false, msg: "密码需 6-64 位" }, 400);
+    const salt = randomHex(16);
+    const hash = await pbkdf2(pw, salt);
+    await kv.put("pwd_email:" + email, JSON.stringify({ salt, hash, email, created: Date.now() }));
+  }
+
+  const token = randomHex(32);
+  const session = { provider: "email", email, name: email.split("@")[0], created: Date.now() };
+  await kv.put("session:" + token, JSON.stringify(session), { expirationTtl: SESSION_TTL });
+
+  return json({ ok: true, msg: "登录成功", user: session }, 200, {
+    "Set-Cookie": `utau_session=${token}; Path=/; Max-Age=${SESSION_TTL}; Secure; HttpOnly; SameSite=Lax`,
+  });
+}
+
+// 邮箱 + 密码直接登录（注册时设过密码的账号）
+async function handleEmailPassword(body, kv) {
+  const email = String(body.email || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  if (!EMAIL_RE.test(email)) return json({ ok: false, msg: "邮箱格式不正确" }, 400);
+  if (!password) return json({ ok: false, msg: "请输入密码" }, 400);
+
+  const raw = await kv.get("pwd_email:" + email).catch(() => null);
+  let authorized = false;
+  if (raw) {
+    try {
+      const rec = JSON.parse(raw);
+      const hash = await pbkdf2(password, rec.salt);
+      authorized = hash === rec.hash;
+    } catch (e) { authorized = false; }
+  }
+  if (!authorized) return json({ ok: false, msg: "邮箱或密码错误" }, 401);
+
   const token = randomHex(32);
   const session = { provider: "email", email, name: email.split("@")[0], created: Date.now() };
   await kv.put("session:" + token, JSON.stringify(session), { expirationTtl: SESSION_TTL });
@@ -193,6 +241,7 @@ export async function onRequest(context) {
     let resp;
     if (action === "sendcode") resp = await handleSendCode(body, kv, env);
     else if (action === "verify") resp = await handleVerify(body, kv);
+    else if (action === "login-password") resp = await handleEmailPassword(body, kv);
     else resp = json({ ok: false, msg: "未知操作" }, 400);
     return withCors(resp, request);
   }
