@@ -37,10 +37,27 @@ function originAllowed(request) {
   try { return ALLOWED_ORIGINS.includes(new URL(ref).origin); } catch (e) { return false; }
 }
 
-function json(obj, status = 200, extra = {}) {
+function corsHeaders(request) {
+  const origin = request.headers.get("Origin") || "";
+  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin",
+  };
+}
+
+function json(obj, status = 200, extra = {}, request) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", ...SECURITY_HEADERS, ...extra },
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...SECURITY_HEADERS,
+      ...(request ? corsHeaders(request) : {}),
+      ...extra,
+    },
   });
 }
 
@@ -149,24 +166,36 @@ async function handleVerify(body, kv) {
   });
 }
 
+function withCors(resp, request) {
+  const h = new Headers(resp.headers);
+  const ch = corsHeaders(request);
+  for (const [k, v] of Object.entries(ch)) h.set(k, v);
+  return new Response(resp.body, { status: resp.status, headers: h });
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
-  if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+  // 跨域预检
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders(request) });
+  }
 
   const kv = env.AUTH_KV || env.TOKENS;
-  if (!kv) return json({ ok: false, msg: "KV 未绑定（AUTH_KV / TOKENS）" }, 500);
+  if (!kv) return withCors(json({ ok: false, msg: "KV 未绑定（AUTH_KV / TOKENS）" }, 500), request);
 
   const action = new URL(request.url).searchParams.get("action");
 
   if (request.method === "POST") {
     // CSRF：跨站伪造的写操作被 Origin/Referer 白名单拦截
-    if (!originAllowed(request)) return json({ ok: false, msg: "非法来源，拒绝操作" }, 403);
+    if (!originAllowed(request)) return withCors(json({ ok: false, msg: "非法来源，拒绝操作" }, 403), request);
     let body;
-    try { body = await request.json(); } catch (e) { return json({ ok: false, msg: "请求体不是合法 JSON" }, 400); }
-    if (action === "sendcode") return handleSendCode(body, kv, env);
-    if (action === "verify") return handleVerify(body, kv);
-    return json({ ok: false, msg: "未知操作" }, 400);
+    try { body = await request.json(); } catch (e) { return withCors(json({ ok: false, msg: "请求体不是合法 JSON" }, 400), request); }
+    let resp;
+    if (action === "sendcode") resp = await handleSendCode(body, kv, env);
+    else if (action === "verify") resp = await handleVerify(body, kv);
+    else resp = json({ ok: false, msg: "未知操作" }, 400);
+    return withCors(resp, request);
   }
 
-  return json({ ok: false, msg: "方法错误" }, 405);
+  return withCors(json({ ok: false, msg: "方法错误" }, 405), request);
 }
