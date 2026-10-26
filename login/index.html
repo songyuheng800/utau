@@ -264,6 +264,7 @@
     const old = btn.textContent;
     btn.disabled = true;
     btn.textContent = "发送中…";
+    showMsg("info", "正在发送验证码，请稍候…");
     try {
       const r = await fetch(OTP_API + "?action=sendcode", {
         method: "POST",
@@ -271,7 +272,7 @@
         body: JSON.stringify({ email }),
       });
       const d = await r.json().catch(() => ({}));
-      if (d.ok) { showMsg("info", "验证码已发送，请查收邮箱"); startCountdown(btn); }
+      if (d.ok) { showMsg("ok", "验证码已发送，请查收邮箱"); startCountdown(btn); }
       else { showMsg("err", d.msg || "发送失败"); btn.disabled = false; btn.textContent = old; }
     } catch (e) {
       showMsg("err", "网络错误，请稍后重试");
