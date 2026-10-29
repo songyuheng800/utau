@@ -1,0 +1,26 @@
+name: send-otp-mail-45
+
+on:
+  repository_dispatch:
+    types: [send-otp-45]
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm i nodemailer@6
+      - name: send mail
+        env:
+          SMTP_NODES: ${{ secrets.SMTP_NODES }}
+          SMTP_USER: ${{ secrets.QQ_SMTP_USER }}
+          SMTP_PASS: ${{ secrets.QQ_SMTP_PASS }}
+          TO: ${{ github.event.client_payload.email }}
+          CODE: ${{ github.event.client_payload.code }}
+          SUBJECT: ${{ github.event.client_payload.subject }}
+          TEXT: ${{ github.event.client_payload.text }}
+        run: node scripts/send-otp.mjs
