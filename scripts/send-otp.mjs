@@ -30,9 +30,9 @@ if (!nodes.length) {
   process.exit(1);
 }
 
-const text =
-  TEXT ||
-  `你的登录验证码是：${CODE}\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）`;
+const text = magicMode
+  ? `UTAU 登录授权\n\n点击下面的链接一键登录（10分钟内有效）：\n${MAGIC_URL}\n\n或输入验证码：${CODE}\n\n（请勿泄露。非本人操作请忽略。）`
+  : `你的登录验证码是：${CODE}\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）`;
 
 // HTML 邮件：保留数字验证码，有 MAGIC_URL 时额外渲染一键授权按钮
 let html;
@@ -44,6 +44,7 @@ if (magicMode) {
     `<div style="text-align:center;margin:22px 0;">` +
     `<a href="${MAGIC_URL}" style="display:inline-block;background:#f5c542;color:#1a1a1a;text-decoration:none;font-size:16px;font-weight:700;padding:14px 40px;border-radius:10px;">一键授权登录</a>` +
     `</div>` +
+    `<p style="font-size:11px;color:#999;word-break:break-all;margin:0 0 16px;">如按钮无法点击，复制此链接到浏览器：<br>${MAGIC_URL}</p>` +
     `<div style="border-top:1px solid #eee;padding-top:18px;margin-top:6px;">` +
     `<p style="font-size:13px;color:#666;margin:0 0 6px;">或输入验证码：</p>` +
     `<div style="font-size:30px;letter-spacing:8px;font-weight:bold;color:#4f7c8f;">${CODE}</div>` +
