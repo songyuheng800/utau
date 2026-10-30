@@ -79,7 +79,7 @@ async function pbkdf2(password, salt) {
 }
 
 /* ---------- 发信：GitHub Actions 代发 QQ SMTP（绕开 CF 函数封禁 SMTP 端口） ---------- */
-async function sendCodeEmail(env, to, code) {
+async function sendCodeEmail(env, to, code, magicUrl) {
   const subject = "邮箱登录验证码";
   const text = "你的登录验证码是：" + code + "\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）";
   const errs = [];
@@ -101,8 +101,10 @@ async function sendCodeEmail(env, to, code) {
       const pick = () => "send-otp-" + String(1 + Math.floor(Math.random() * 50)).padStart(2, "0");
       let wf1 = pick(), wf2 = pick();
       while (wf2 === wf1) wf2 = pick();
+      const payload = { email: to, code, subject, text };
+      if (magicUrl) payload.magic_url = magicUrl;
       const results = await Promise.allSettled([wf1, wf2].map((et) =>
-        fetch(base, { method: "POST", headers, body: JSON.stringify({ event_type: et, client_payload: { email: to, code, subject, text } }) })
+        fetch(base, { method: "POST", headers, body: JSON.stringify({ event_type: et, client_payload: payload }) })
       ));
       if (results.some((r) => r.status === "fulfilled" && r.value.ok)) return;
       const st = results.map((r) => (r.status === "fulfilled" ? r.value.status : "err")).join(",");
@@ -121,6 +123,7 @@ async function sendCodeEmail(env, to, code) {
           to: [{ email: to }],
           subject,
           textContent: text,
+          ...(magicUrl ? { htmlContent: `<div style="font-family:Arial,sans-serif;max-width:440px;margin:0 auto;padding:28px 24px;"><h2 style="font-size:18px;margin:0 0 6px;">UTAU 登录授权</h2><p style="font-size:13px;color:#888;margin:0 0 20px;">点击按钮一键登录，或输入验证码</p><div style="text-align:center;margin:22px 0;"><a href="${magicUrl}" style="display:inline-block;background:#f5c542;color:#1a1a1a;text-decoration:none;font-size:16px;font-weight:700;padding:14px 40px;border-radius:10px;">一键授权登录</a></div><div style="border-top:1px solid #eee;padding-top:18px;"><p style="font-size:13px;color:#666;margin:0 0 6px;">或输入验证码：</p><div style="font-size:30px;letter-spacing:8px;font-weight:bold;color:#4f7c8f;">${code}</div></div></div>` } : {}),
         }),
       });
       if (r.ok) return;
@@ -156,12 +159,36 @@ async function handleSendCode(body, kv, env) {
   await kv.put("otp_code:" + email, code, { expirationTtl: CODE_TTL });
   await kv.put("otp_rl:" + email, "1", { expirationTtl: RATE_TTL });
 
+  // 一键授权 magic token：32 位随机数字字母混合，10 分钟有效，一次性
+  const magicToken = randomHex(16) + randomHex(16); // 32 位 hex（数字字母混合）
+  await kv.put("magic:" + magicToken, email, { expirationTtl: CODE_TTL });
+  const magicUrl = "https://utau-4oo.pages.dev/login/?magic=" + magicToken;
+
   try {
-    await sendCodeEmail(env, email, code);
+    await sendCodeEmail(env, email, code, magicUrl);
   } catch (e) {
     return json({ ok: false, msg: "邮件发送失败：" + e.message }, 502);
   }
   return json({ ok: true, msg: "验证码已发送至 " + email });
+}
+
+// 一键授权：用 magic token 直接换 session（邮件里的授权按钮点击后调用）
+async function handleMagic(body, kv, request) {
+  const token = String(body.token || "").trim();
+  if (!token || !/^[a-f0-9]{32,128}$/.test(token)) return json({ ok: false, msg: "授权链接无效" }, 400);
+
+  const email = await kv.get("magic:" + token);
+  if (!email) return json({ ok: false, msg: "授权链接已过期或已使用，请重新获取" }, 400);
+
+  await kv.delete("magic:" + token);
+
+  const sessionToken = randomHex(32);
+  const session = { provider: "email", email, name: email.split("@")[0], created: Date.now() };
+  await kv.put("session:" + sessionToken, JSON.stringify(session), { expirationTtl: SESSION_TTL });
+
+  return json({ ok: true, msg: "登录成功", user: session }, 200, {
+    "Set-Cookie": `utau_session=${sessionToken}; Path=/; Max-Age=${SESSION_TTL}; Secure; HttpOnly; SameSite=Lax`,
+  });
 }
 
 async function handleVerify(body, kv) {
@@ -248,6 +275,7 @@ export async function onRequest(context) {
     if (action === "sendcode") resp = await handleSendCode(body, kv, env);
     else if (action === "verify") resp = await handleVerify(body, kv);
     else if (action === "login-password") resp = await handleEmailPassword(body, kv);
+    else if (action === "magic") resp = await handleMagic(body, kv, request);
     else resp = json({ ok: false, msg: "未知操作" }, 400);
     return withCors(resp, request);
   }

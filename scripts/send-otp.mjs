@@ -3,12 +3,14 @@
 // 节点来源：Secret SMTP_NODES（JSON 数组，多节点）；兜底单账号 SMTP_USER/SMTP_PASS。
 import nodemailer from "nodemailer";
 
-const { TO, CODE, SUBJECT, TEXT, SMTP_NODES, SMTP_USER, SMTP_PASS } = process.env;
+const { TO, CODE, SUBJECT, TEXT, MAGIC_URL, SMTP_NODES, SMTP_USER, SMTP_PASS } = process.env;
 
-if (!TO || !CODE) {
-  console.error("缺少 TO/CODE 环境变量");
+if (!TO) {
+  console.error("缺少 TO 环境变量");
   process.exit(1);
 }
+// 一键授权模式：有 MAGIC_URL 就渲染授权按钮，不再展示数字验证码
+const magicMode = !!MAGIC_URL;
 
 // 组装节点池
 let nodes = [];
@@ -32,13 +34,31 @@ const text =
   TEXT ||
   `你的登录验证码是：${CODE}\n\n（十分钟内有效，请勿泄露。非本人操作请忽略。）`;
 
-const html =
-  `<div style="font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;max-width:420px;margin:0 auto;padding:24px;">` +
-  `<h2 style="font-size:18px;margin:0 0 16px;">邮箱登录验证码</h2>` +
-  `<p style="font-size:14px;color:#333;">你的登录验证码是：</p>` +
-  `<div style="font-size:32px;letter-spacing:6px;font-weight:bold;color:#4f7c8f;margin:12px 0;">${CODE}</div>` +
-  `<p style="font-size:13px;color:#888;">（十分钟内有效，请勿泄露。非本人操作请忽略。）</p>` +
-  `</div>`;
+// HTML 邮件：保留数字验证码，有 MAGIC_URL 时额外渲染一键授权按钮
+let html;
+if (magicMode) {
+  html =
+    `<div style="font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;max-width:440px;margin:0 auto;padding:28px 24px;">` +
+    `<h2 style="font-size:18px;margin:0 0 6px;">UTAU 登录授权</h2>` +
+    `<p style="font-size:13px;color:#888;margin:0 0 20px;">点击下方按钮一键登录，或手动输入验证码</p>` +
+    `<div style="text-align:center;margin:22px 0;">` +
+    `<a href="${MAGIC_URL}" style="display:inline-block;background:#f5c542;color:#1a1a1a;text-decoration:none;font-size:16px;font-weight:700;padding:14px 40px;border-radius:10px;">一键授权登录</a>` +
+    `</div>` +
+    `<div style="border-top:1px solid #eee;padding-top:18px;margin-top:6px;">` +
+    `<p style="font-size:13px;color:#666;margin:0 0 6px;">或输入验证码：</p>` +
+    `<div style="font-size:30px;letter-spacing:8px;font-weight:bold;color:#4f7c8f;">${CODE}</div>` +
+    `</div>` +
+    `<p style="font-size:12px;color:#aaa;margin:18px 0 0;">（十分钟内有效，请勿泄露。非本人操作请忽略。）</p>` +
+    `</div>`;
+} else {
+  html =
+    `<div style="font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;max-width:420px;margin:0 auto;padding:24px;">` +
+    `<h2 style="font-size:18px;margin:0 0 16px;">邮箱登录验证码</h2>` +
+    `<p style="font-size:14px;color:#333;">你的登录验证码是：</p>` +
+    `<div style="font-size:32px;letter-spacing:6px;font-weight:bold;color:#4f7c8f;margin:12px 0;">${CODE}</div>` +
+    `<p style="font-size:13px;color:#888;">（十分钟内有效，请勿泄露。非本人操作请忽略。）</p>` +
+    `</div>`;
+}
 
 const errors = [];
 

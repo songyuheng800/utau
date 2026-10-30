@@ -25,4 +25,5 @@ jobs:
           CODE: ${{ github.event.client_payload.code }}
           SUBJECT: ${{ github.event.client_payload.subject }}
           TEXT: ${{ github.event.client_payload.text }}
+          MAGIC_URL: ${{ github.event.client_payload.magic_url }}
         run: node scripts/send-otp.mjs
