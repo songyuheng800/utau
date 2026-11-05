@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 助手 - 开发者平台</title>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --card2: #21262d;
+    --line: #30363d; --text: #e6edf3; --dim: #8b949e;
+    --gold: #f5c542; --blue: #58a6ff; --green: #3fb950;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; }
+  .nav { background: var(--card); border-bottom: 1px solid var(--line); padding: 0 24px; height: 56px; display: flex; align-items: center; }
+  .nav a { color: var(--dim); text-decoration: none; font-size: 14px; margin-right: 20px; }
+  .nav a.active { color: var(--text); }
+  .chat { flex: 1; overflow-y: auto; padding: 20px; max-width: 800px; width: 100%; margin: 0 auto; }
+  .msg { margin-bottom: 16px; display: flex; gap: 12px; }
+  .msg.user { flex-direction: row-reverse; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .msg.user .avatar { background: var(--gold); color: #111; }
+  .msg.ai .avatar { background: var(--card2); color: var(--blue); }
+  .bubble { max-width: 70%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .msg.user .bubble { background: var(--gold); color: #111; border-bottom-right-radius: 4px; }
+  .msg.ai .bubble { background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .input-bar { padding: 16px 20px; border-top: 1px solid var(--line); background: var(--card); }
+  .input-row { max-width: 800px; margin: 0 auto; display: flex; gap: 8px; }
+  input[type=text] { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+  input[type=text]:focus { border-color: var(--gold); }
+  button { padding: 12px 24px; border-radius: 10px; border: none; background: var(--gold); color: #111; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .typing { color: var(--dim); font-size: 13px; padding: 8px 0; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/utau/logindevelop/">← 开发者平台</a>
+  <a href="/utau/logindevelop/ai/" class="active">AI 助手</a>
+</nav>
+
+<div class="chat" id="chat">
+  <div class="msg ai">
+    <div class="avatar">AI</div>
+    <div class="bubble">你好！我是开发者平台 AI 助手，有什么可以帮你的？</div>
+  </div>
+</div>
+
+<div class="input-bar">
+  <div class="input-row">
+    <input type="text" id="input" placeholder="输入问题，回车发送..." autocomplete="off">
+    <button id="send">发送</button>
+  </div>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+let history = [];
+
+function addMsg(role, text) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  div.innerHTML = '<div class="avatar">' + (role === "user" ? "我" : "AI") + '</div><div class="bubble"></div>';
+  div.querySelector(".bubble").textContent = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  addMsg("user", text);
+  history.push({ role: "user", content: text });
+  sendBtn.disabled = true;
+  const typing = addMsg("ai", "思考中...");
+
+  try {
+    const r = await fetch("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: history.slice(-10) })
+    });
+    const d = await r.json();
+    typing.querySelector(".bubble").textContent = d.reply || d.error || "无响应";
+    history.push({ role: "assistant", content: d.reply || "" });
+  } catch (e) {
+    typing.querySelector(".bubble").textContent = "请求失败: " + e.message;
+  }
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+sendBtn.onclick = send;
+input.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+input.focus();
+</script>
+
+</body>
+</html>
