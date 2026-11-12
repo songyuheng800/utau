@@ -80,14 +80,19 @@ async function send() {
   const typing = addMsg("ai", "思考中...");
 
   try {
-    const r = await fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history.slice(-10) })
-    });
-    const d = await r.json();
-    typing.querySelector(".bubble").textContent = d.reply || d.error || "无响应";
-    history.push({ role: "assistant", content: d.reply || "" });
+    let d = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history.slice(-10) })
+      });
+      if (r.ok) { d = await r.json(); break; }
+      if (attempt === 0) { await new Promise(s => setTimeout(s, 1200)); continue; }
+      d = await r.json().catch(() => ({ error: "HTTP " + r.status }));
+    }
+    typing.querySelector(".bubble").textContent = (d && (d.reply || d.error)) || "无响应";
+    history.push({ role: "assistant", content: (d && d.reply) || "" });
   } catch (e) {
     typing.querySelector(".bubble").textContent = "请求失败: " + e.message;
   }
