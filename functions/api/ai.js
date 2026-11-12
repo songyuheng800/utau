@@ -17,10 +17,12 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+export function onRequestOptions() {
+  return new Response(null, { headers: CORS });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
-
-  if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
   try {
     const body = await request.json();

@@ -36,8 +36,8 @@
 <body>
 
 <nav class="nav">
-  <a href="/logindevelop/">← 开发者平台</a>
-  <a href="/logindevelop/ai/" class="active">AI 助手</a>
+  <a href="../">← 开发者平台</a>
+  <a href="./" class="active">AI 助手</a>
 </nav>
 
 <div class="chat" id="chat">
@@ -59,6 +59,9 @@ const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 let history = [];
+
+// 后端只部署在 Cloudflare Pages；GitHub Pages 为纯静态，跨域调用 CF 接口。
+const API_BASE = location.hostname.endsWith("github.io") ? "https://utau-4oo.pages.dev" : "";
 
 function addMsg(role, text) {
   const div = document.createElement("div");
@@ -82,7 +85,7 @@ async function send() {
   try {
     let d = null;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const r = await fetch("/api/ai", {
+      const r = await fetch(API_BASE + "/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history.slice(-10) })
