@@ -130,6 +130,18 @@
           <button class="pwd-btn" id="otpPwdLoginBtn" style="width:100%;margin-top:8px">使用邮箱密码登录</button>
           <div class="pwd-hint">首次用验证码登录时可在此设密码；之后直接用邮箱+密码登录，不必再收验证码。</div>
         </div>
+        <div class="divider"><span>或使用手机验证码登录</span></div>
+        <div class="pwd-box" id="smsBox">
+          <input type="tel" id="smsPhone" placeholder="手机号（接收验证码并登录）" autocomplete="tel" maxlength="11" inputmode="numeric">
+          <div class="otp-row">
+            <input type="text" id="smsCode" placeholder="6 位验证码" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+            <button class="pwd-btn otp-send" id="smsSendBtn">发送验证码</button>
+          </div>
+          <input type="password" id="smsPwd" placeholder="设置密码（6-64 位，注册时填写）" autocomplete="new-password">
+          <button class="pwd-btn primary" id="smsLoginBtn">验证码登录 / 注册</button>
+          <button class="pwd-btn" id="smsPwdLoginBtn" style="width:100%;margin-top:8px">使用手机密码登录</button>
+          <div class="pwd-hint">首次用验证码登录时可在此设密码；之后直接用手机号+密码登录。</div>
+        </div>
         <div class="tip">
           <b>说明：</b>第三方登录点击后跳转对应平台授权，<br>确认后自动回到本站。
         </div>
@@ -281,6 +293,7 @@
   const OTP_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   let otpTimer = null;
   function startCountdown(btn) {
+    if (otpTimer) clearInterval(otpTimer);
     let s = 60;
     btn.disabled = true;
     btn.textContent = s + "s 后重发";
@@ -375,6 +388,103 @@
         $("uLogin").textContent = email;
         $("title").textContent = "欢迎，" + (d.user.name || email);
         $("sub").textContent = "当前以 邮箱密码 登录本站";
+      } else {
+        showMsg("err", d.msg || "登录失败");
+      }
+    } catch (e) {
+      showMsg("err", "网络错误，请稍后重试");
+    } finally {
+      btn.disabled = false; btn.textContent = old;
+    }
+  });
+
+  // 手机短信验证码登录 / 注册（独立体系，后端 /sms-login，与邮箱平行）
+  const SMS_API = "https://utau-4oo.pages.dev/sms-login";
+  const PHONE_RE = /^1[3-9]\d{9}$/;
+  const normPhone = (v) => String(v || "").replace(/[^\d]/g, "");
+
+  $("smsSendBtn").addEventListener("click", async () => {
+    const phone = normPhone($("smsPhone").value);
+    if (!PHONE_RE.test(phone)) return showMsg("err", "请填写正确的 11 位手机号");
+    const btn = $("smsSendBtn");
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "发送中…";
+    showMsg("info", "正在发送验证码，请稍候…");
+    try {
+      const r = await fetch(SMS_API + "?action=sendcode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d.ok) { showMsg("ok", "验证码已发送，请查收短信"); startCountdown(btn); }
+      else { showMsg("err", d.msg || "发送失败"); btn.disabled = false; btn.textContent = old; }
+    } catch (e) {
+      showMsg("err", "网络错误，请稍后重试");
+      btn.disabled = false; btn.textContent = old;
+    }
+  });
+  $("smsLoginBtn").addEventListener("click", async () => {
+    const phone = normPhone($("smsPhone").value);
+    const code = $("smsCode").value.trim();
+    if (!PHONE_RE.test(phone)) return showMsg("err", "请填写正确的 11 位手机号");
+    if (!/^\d{6}$/.test(code)) return showMsg("err", "请输入 6 位验证码");
+    const btn = $("smsLoginBtn");
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "验证中…";
+    try {
+      const r = await fetch(SMS_API + "?action=verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code, password: $("smsPwd").value }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d.ok) {
+        $("viewGuest").classList.add("hidden");
+        $("viewUser").classList.remove("hidden");
+        $("uAvatar").src = "";
+        $("uName").textContent = d.user.name || ("用户" + phone.slice(-4));
+        $("uLogin").textContent = phone;
+        $("title").textContent = "欢迎，" + (d.user.name || phone);
+        $("sub").textContent = "当前以 手机验证码 登录本站";
+      } else {
+        showMsg("err", d.msg || "登录失败");
+      }
+    } catch (e) {
+      showMsg("err", "网络错误，请稍后重试");
+    } finally {
+      btn.disabled = false; btn.textContent = old;
+    }
+  });
+  $("smsPwdLoginBtn").addEventListener("click", async () => {
+    const phone = normPhone($("smsPhone").value);
+    const password = $("smsPwd").value;
+    if (!PHONE_RE.test(phone)) return showMsg("err", "请填写正确的 11 位手机号");
+    if (!password) return showMsg("err", "请输入密码");
+    const btn = $("smsPwdLoginBtn");
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "登录中…";
+    showMsg("info", "正在校验账号…");
+    try {
+      const r = await fetch(SMS_API + "?action=login-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d.ok) {
+        $("viewGuest").classList.add("hidden");
+        $("viewUser").classList.remove("hidden");
+        $("uAvatar").src = "";
+        $("uName").textContent = d.user.name || ("用户" + phone.slice(-4));
+        $("uLogin").textContent = phone;
+        $("title").textContent = "欢迎，" + (d.user.name || phone);
+        $("sub").textContent = "当前以 手机密码 登录本站";
       } else {
         showMsg("err", d.msg || "登录失败");
       }
