@@ -217,18 +217,29 @@ async function retry(fn, n = 3) {
 
 async function shardPost(path, body) {
   return retry(async () => {
-    const r = await fetch(SHARD_API + path, {
+    const r = await fetchWithTimeout(SHARD_API + path, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(body),
-    });
+    }, 15000);
     if (r.status >= 500) throw new Error("HTTP " + r.status);
     return r.json();
   });
 }
 
 // 分片上行并发度（免费 D1 并发写偶发冲突，缺片由 finalize 自愈补传兜底）
-const CHUNK_PARALLEL = 3;
+const CHUNK_PARALLEL = 4;
+
+// 带超时的 fetch：单片卡住时及时中止，让出并发槽位交给重试，避免僵死拖慢整批
+async function fetchWithTimeout(url, opts, ms = 30000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // 单片二进制直传：切片 Blob 直接进 FormData，不读 base64、不全量进内存
 async function uploadOneChunk(fileId, index, slice) {
@@ -237,7 +248,7 @@ async function uploadOneChunk(fileId, index, slice) {
   fd.append("index", String(index));
   fd.append("file", slice, `part-${index}`);
   const r = await retry(async () => {
-    const res = await fetch(SHARD_API + "/chunk", { method: "POST", body: fd });
+    const res = await fetchWithTimeout(SHARD_API + "/chunk", { method: "POST", body: fd }, 30000);
     if (res.status >= 500) throw new Error("HTTP " + res.status);
     return res.json().catch(() => ({ ok: false, msg: "响应解析失败" }));
   });
